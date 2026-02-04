@@ -28,8 +28,21 @@ No scripted commands were found in this repo (confirm).
 - Match connector codes and schema naming from the ingest/schema repos.
 - Naming conventions (project-wide) live in the ingest repo: `../CIC-test-uk-aq-ingest/AGENTS.md`.
 
+## Permissions (REQUIRED)
+- The agent may edit any files without asking for permission, except files under any `/archive` directory.
+
 ## Links
 - Existing README: `README.md`
 - Ingest repo (sibling): `../CIC-test-uk-aq-ingest`
 - Naming conventions (ingest repo): `../CIC-test-uk-aq-ingest/AGENTS.md`
 - Schema repo (sibling): `../CIC-test-uk-aq-schema/uk-aq-schema`
+
+## WORKING STYLE (IMPORTANT)
+
+REQUIRED OUTPUT FORMAT
+
+Summary (2–5 bullets)
+Files changed (paths)
+Implementation details (short, specific)
+Supabase steps (instructions only,)
+Verification checklist (clear pass/fail)
