@@ -1,5 +1,8 @@
 # Cross-repo map: uk-aq-history
 
+## Main repo
+- `CIC-test-uk-aq-ingest` is the main repo for this project and the default starting point for cross-repo tasks.
+
 ## Purpose
 This repo is intended for historical backfills, batch processing, and analysis scripts that work on the UK AQ dataset. It is intentionally minimal for now.
 
