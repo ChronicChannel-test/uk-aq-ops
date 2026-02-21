@@ -2,6 +2,8 @@
 
 This deploys the daily ingest-prune verification job as a Cloud Run service and invokes it from Cloud Scheduler at `02:00 UTC`.
 
+Dry-run includes a repair pilot: it can enqueue one mismatch bucket to the ingest DB history outbox, flush all due outbox entries, and then recheck that bucket.
+
 ## 1) Set variables
 
 ```bash
@@ -57,7 +59,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --memory 256Mi \
   --min-instances 0 \
   --max-instances 1 \
-  --set-env-vars "SUPABASE_URL=${SUPABASE_URL},HISTORY_SUPABASE_URL=${HISTORY_SUPABASE_URL},DRY_RUN=true,MAX_HOURS_PER_RUN=48,DELETE_BATCH_SIZE=50000,MAX_DELETE_BATCHES_PER_HOUR=10" \
+  --set-env-vars "SUPABASE_URL=${SUPABASE_URL},HISTORY_SUPABASE_URL=${HISTORY_SUPABASE_URL},DRY_RUN=true,MAX_HOURS_PER_RUN=48,DELETE_BATCH_SIZE=50000,MAX_DELETE_BATCHES_PER_HOUR=10,REPAIR_ONE_MISMATCH_BUCKET=true,REPAIR_BUCKET_OUTBOX_CHUNK_SIZE=1000,FLUSH_CLAIM_BATCH_LIMIT=20,MAX_FLUSH_BATCHES=30" \
   --set-secrets "SB_SECRET_KEY=SB_SECRET_KEY:latest,HISTORY_SECRET_KEY=HISTORY_SECRET_KEY:latest" \
   --labels "job=${JOB_NAME},service=${SERVICE_NAME}"
 ```
@@ -169,6 +171,10 @@ Set these GitHub Actions repository variables:
 - `GCP_OPS_PRUNE_MAX_HOURS_PER_RUN` (optional, default `48`)
 - `GCP_OPS_PRUNE_DELETE_BATCH_SIZE` (optional, default `50000`)
 - `GCP_OPS_PRUNE_MAX_DELETE_BATCHES_PER_HOUR` (optional, default `10`)
+- `GCP_OPS_PRUNE_REPAIR_ONE_MISMATCH_BUCKET` (optional, default `true`)
+- `GCP_OPS_PRUNE_REPAIR_BUCKET_OUTBOX_CHUNK_SIZE` (optional, default `1000`)
+- `GCP_OPS_PRUNE_FLUSH_CLAIM_BATCH_LIMIT` (optional, default `20`)
+- `GCP_OPS_PRUNE_MAX_FLUSH_BATCHES` (optional, default `30`)
 - `SB_SECRET_KEY_SECRET_NAME` (optional, default `SB_SECRET_KEY`)
 - `HISTORY_SECRET_KEY_SECRET_NAME` (optional, default `HISTORY_SECRET_KEY`)
 
