@@ -1,183 +1,135 @@
-# uk-aq-ingestdb-prune setup (Cloud Run + Scheduler)
+# uk-aq-ingestdb-prune behavior
 
-This deploys the daily ingest-prune verification job as a Cloud Run service and invokes it from Cloud Scheduler at `02:00 UTC`.
+This document describes what the prune function does at runtime.
 
-Dry-run includes a repair pilot: it can enqueue one mismatch bucket to the ingest DB history outbox, flush all due outbox entries, and then recheck that bucket.
+## Purpose
 
-## 1) Set variables
+`POST /run` verifies that ingest observations older than 7 days are present in history with identical content, then deletes only verified ingest buckets.
 
-```bash
-export PROJECT_ID="your-project-id"
-export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
-export REGION="europe-west2"
+Bucket key is:
 
-export SERVICE_NAME="uk-aq-ingestdb-prune-service"
-export JOB_NAME="uk-aq-ingestdb-prune-daily"
+- `connector_id`
+- `hour_start` (`date_trunc('hour', observed_at)` in UTC)
 
-export OPS_SA_NAME="uk-aq-ops-job"
-export OPS_SA_EMAIL="${OPS_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+## Core flow
 
-# Required DB URLs
-export SUPABASE_URL="https://YOUR_INGEST_PROJECT.supabase.co"
-export HISTORY_SUPABASE_URL="https://YOUR_HISTORY_PROJECT.supabase.co"
-```
+1. Build UTC window:
+- `window_end = UTC midnight today - 7 days`
+- `window_start = window_end - MAX_HOURS_PER_RUN`
 
-## 2) Create the dedicated service account
+2. Fetch hourly summaries via RPC from both DBs:
+- ingest: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
+- history: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
 
-```bash
-gcloud iam service-accounts create "$OPS_SA_NAME" \
-  --project "$PROJECT_ID" \
-  --display-name "UK AQ Ops Job"
-```
+3. Compare buckets by `(connector_id, hour_start)`:
+- missing in history -> mismatch
+- count differs -> mismatch
+- fingerprint differs -> mismatch
+- count and fingerprint equal -> deletable
 
-## 3) Grant least-privilege secret access (runtime)
+Comparison scope rule:
 
-```bash
-gcloud secrets add-iam-policy-binding SB_SECRET_KEY \
-  --project "$PROJECT_ID" \
-  --member "serviceAccount:${OPS_SA_EMAIL}" \
-  --role "roles/secretmanager.secretAccessor"
+- A bucket must exist in ingest to be checked for parity and considered for deletion.
+- Buckets that exist only in history are not treated as mismatches for delete gating.
 
-gcloud secrets add-iam-policy-binding HISTORY_SECRET_KEY \
-  --project "$PROJECT_ID" \
-  --member "serviceAccount:${OPS_SA_EMAIL}" \
-  --role "roles/secretmanager.secretAccessor"
-```
+4. Log structured results:
+- mismatches at `ERROR`
+- deletable plan at `INFO`
+- history-only buckets at `INFO` with event `history_extra_buckets`
 
-## 4) Deploy Cloud Run service
+## Dry-run behavior
 
-From the `uk-aq-ops` repo root:
+When `DRY_RUN=true`, no delete RPC is called.
 
-```bash
-gcloud run deploy "$SERVICE_NAME" \
-  --project "$PROJECT_ID" \
-  --region "$REGION" \
-  --source . \
-  --service-account "$OPS_SA_EMAIL" \
-  --no-allow-unauthenticated \
-  --cpu 1 \
-  --memory 256Mi \
-  --min-instances 0 \
-  --max-instances 1 \
-  --set-env-vars "SUPABASE_URL=${SUPABASE_URL},HISTORY_SUPABASE_URL=${HISTORY_SUPABASE_URL},DRY_RUN=true,MAX_HOURS_PER_RUN=48,DELETE_BATCH_SIZE=50000,MAX_DELETE_BATCHES_PER_HOUR=10,REPAIR_ONE_MISMATCH_BUCKET=true,REPAIR_BUCKET_OUTBOX_CHUNK_SIZE=1000,FLUSH_CLAIM_BATCH_LIMIT=20,MAX_FLUSH_BATCHES=30" \
-  --set-secrets "SB_SECRET_KEY=SB_SECRET_KEY:latest,HISTORY_SECRET_KEY=HISTORY_SECRET_KEY:latest" \
-  --labels "job=${JOB_NAME},service=${SERVICE_NAME}"
-```
+If `REPAIR_ONE_MISMATCH_BUCKET=true`, dry-run also runs a repair pilot for one mismatch bucket:
 
-## 5) Allow the service account to invoke Cloud Run
+1. Enqueue that bucket’s rows to ingest outbox via:
+- `uk_aq_public.uk_aq_rpc_history_outbox_enqueue_hour_bucket`
 
-```bash
-gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
-  --project "$PROJECT_ID" \
-  --region "$REGION" \
-  --member "serviceAccount:${OPS_SA_EMAIL}" \
-  --role "roles/run.invoker"
-```
+2. Flush outbox immediately, inside the prune run itself:
+- claim: `uk_aq_public.uk_aq_rpc_history_outbox_claim`
+- upsert to history: `uk_aq_public.uk_aq_rpc_history_observations_upsert`
+- receipts upsert: `uk_aq_public.uk_aq_rpc_history_sync_receipt_daily_upsert`
+- resolve: `uk_aq_public.uk_aq_rpc_history_outbox_resolve`
 
-## 6) Allow Cloud Scheduler service agent to mint OIDC token for the ops SA
+3. Recheck that same bucket with hourly fingerprint RPCs.
 
-```bash
-gcloud iam service-accounts add-iam-policy-binding "$OPS_SA_EMAIL" \
-  --project "$PROJECT_ID" \
-  --member "serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
-  --role "roles/iam.serviceAccountTokenCreator"
-```
+Important:
 
-## 7) Create the scheduler job (daily 02:00 UTC)
+- The prune function does its own outbox flush logic in-process.
+- It does not call the separate `uk-aq-history-outbox-flush-service` endpoint.
 
-```bash
-export SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+## Live delete behavior
 
-gcloud scheduler jobs create http "$JOB_NAME" \
-  --project "$PROJECT_ID" \
-  --location "$REGION" \
-  --schedule "0 2 * * *" \
-  --time-zone "UTC" \
-  --uri "${SERVICE_URL}/run" \
-  --http-method POST \
-  --oidc-service-account-email "$OPS_SA_EMAIL" \
-  --oidc-token-audience "$SERVICE_URL" \
-  --headers "Content-Type=application/json" \
-  --message-body '{}'
-```
+When `DRY_RUN=false`, the flow is:
 
-If the job already exists, use:
+1. First compare pass and first delete pass:
+- delete all buckets that already match
+- log mismatches
 
-```bash
-gcloud scheduler jobs update http "$JOB_NAME" \
-  --project "$PROJECT_ID" \
-  --location "$REGION" \
-  --schedule "0 2 * * *" \
-  --time-zone "UTC" \
-  --uri "${SERVICE_URL}/run" \
-  --http-method POST \
-  --oidc-service-account-email "$OPS_SA_EMAIL" \
-  --oidc-token-audience "$SERVICE_URL" \
-  --headers "Content-Type=application/json" \
-  --message-body '{}'
-```
+2. Repair phase:
+- enqueue all repairable mismatch buckets into history outbox
+- flush outbox in-process (same RPC chain as dry-run pilot)
 
-## 8) Ad-hoc run
+3. Recheck phase:
+- re-run compare for the original mismatch buckets
+- delete buckets that are now verified
+- log buckets that still mismatch after repair
 
-Run scheduler immediately:
+Only one repair/recheck cycle is executed per run.
 
-```bash
-gcloud scheduler jobs run "$JOB_NAME" \
-  --project "$PROJECT_ID" \
-  --location "$REGION"
-```
+Delete RPC:
 
-Direct dry-run call:
+- `uk_aq_public.uk_aq_rpc_observations_delete_hour_bucket`
 
-```bash
-curl -X POST "${SERVICE_URL}/run?dryRun=true" \
-  -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=${SERVICE_URL})"
-```
+Each bucket is deleted in bounded batches until:
 
-Direct live delete call:
+- delete RPC returns `0` (drained), or
+- `MAX_DELETE_BATCHES_PER_HOUR` is reached (warning + alert condition)
 
-```bash
-curl -X POST "${SERVICE_URL}/run?dryRun=false" \
-  -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=${SERVICE_URL})"
-```
+## Guardrails
 
-## 9) Apply SQL RPC scripts
+- All date/hour logic is UTC.
+- No raw row comparison is moved out of DBs for verification; only bucket aggregates are compared.
+- Buckets with any mismatch are skipped from delete in each pass.
+- `history_count > ingest_count` is logged as a specific error condition and not deleted.
 
-- In ingest DB SQL editor: run `sql/ingest_db_ops_rpcs.sql`
-- In history DB SQL editor: run `sql/history_db_ops_rpcs.sql`
+## Logging details
 
-## 10) GitHub Actions deploy workflow
+- Logs are structured JSON on Cloud Run stdout/stderr and appear in Cloud Logging.
+- History-only buckets (present in history, missing in ingest) are logged once per run as:
+  - `severity=INFO`
+  - `event=history_extra_buckets`
+  - fields: `count` and `sample` (sample bucket list)
+- They are informational only and do not block deletes.
+- This is expected after successful prune runs, because deleted ingest buckets will remain in history.
 
-Workflow path:
+## Runtime inputs
 
-- `.github/workflows/uk_aq_ingestdb_prune_cloud_run_deploy.yml`
+Required:
 
-Set these GitHub Actions repository variables:
-
-- `GCP_PROJECT_ID`
-- `GCP_REGION` (optional, default `europe-west2`)
-- `GCP_ARTIFACT_REPO` (optional, default `uk-aq`)
 - `SUPABASE_URL`
 - `HISTORY_SUPABASE_URL`
-- `GCP_WORKLOAD_IDENTITY_PROVIDER` (recommended auth mode)
-- `GCP_SERVICE_ACCOUNT` (existing deploy SA, recommended auth mode)
-- `GCP_OPS_PRUNE_RUNTIME_SERVICE_ACCOUNT` (optional; default `uk-aq-ops-job@<project>.iam.gserviceaccount.com`)
-- `GCP_OPS_PRUNE_SCHEDULER_SERVICE_ACCOUNT` (optional; defaults to runtime SA)
-- `GCP_OPS_PRUNE_SERVICE_NAME` (optional, default `uk-aq-ingestdb-prune-service`)
-- `GCP_OPS_PRUNE_SCHEDULER_JOB_NAME` (optional, default `uk-aq-ingestdb-prune-daily`)
-- `GCP_OPS_PRUNE_SCHEDULER_CRON` (optional, default `0 2 * * *`)
-- `GCP_OPS_PRUNE_SCHEDULER_TIMEZONE` (optional, default `Etc/UTC`)
-- `GCP_OPS_PRUNE_DRY_RUN` (optional, default `true`)
-- `GCP_OPS_PRUNE_MAX_HOURS_PER_RUN` (optional, default `48`)
-- `GCP_OPS_PRUNE_DELETE_BATCH_SIZE` (optional, default `50000`)
-- `GCP_OPS_PRUNE_MAX_DELETE_BATCHES_PER_HOUR` (optional, default `10`)
-- `GCP_OPS_PRUNE_REPAIR_ONE_MISMATCH_BUCKET` (optional, default `true`)
-- `GCP_OPS_PRUNE_REPAIR_BUCKET_OUTBOX_CHUNK_SIZE` (optional, default `1000`)
-- `GCP_OPS_PRUNE_FLUSH_CLAIM_BATCH_LIMIT` (optional, default `20`)
-- `GCP_OPS_PRUNE_MAX_FLUSH_BATCHES` (optional, default `30`)
-- `SB_SECRET_KEY_SECRET_NAME` (optional, default `SB_SECRET_KEY`)
-- `HISTORY_SECRET_KEY_SECRET_NAME` (optional, default `HISTORY_SECRET_KEY`)
+- `SB_SECRET_KEY`
+- `HISTORY_SECRET_KEY`
 
-Optional GitHub Actions secret for fallback auth mode:
+Key optional controls:
 
-- `GCP_SA_KEY` (only needed when not using Workload Identity Federation)
+- `DRY_RUN` (default `true`)
+- `MAX_HOURS_PER_RUN` (default `48`)
+- `DELETE_BATCH_SIZE` (default `50000`)
+- `MAX_DELETE_BATCHES_PER_HOUR` (default `10`)
+- `REPAIR_ONE_MISMATCH_BUCKET` (default `true`)
+- `REPAIR_BUCKET_OUTBOX_CHUNK_SIZE` (default `1000`)
+- `FLUSH_CLAIM_BATCH_LIMIT` (default `20`)
+- `MAX_FLUSH_BATCHES` (default `30`)
+
+## Related SQL scripts
+
+- `sql/ingest_db_ops_rpcs.sql`
+- `sql/history_db_ops_rpcs.sql`
+
+For deployment and scheduler wiring, use:
+
+- `README.md`
+- `.github/workflows/uk_aq_ingestdb_prune_cloud_run_deploy.yml`
