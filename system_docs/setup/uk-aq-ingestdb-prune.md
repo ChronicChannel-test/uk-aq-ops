@@ -14,7 +14,7 @@ Bucket key is:
 ## Core flow
 
 1. Build UTC window:
-- `window_end = UTC midnight today - 7 days`
+- `window_end = UTC midnight today - INGESTDB_RETENTION_DAYS`
 - `window_start = window_end - MAX_HOURS_PER_RUN`
 
 2. Fetch hourly summaries via RPC from both DBs:
@@ -116,6 +116,7 @@ Required:
 Key optional controls:
 
 - `DRY_RUN` (default `true`)
+- `INGESTDB_RETENTION_DAYS` (default `7`)
 - `MAX_HOURS_PER_RUN` (default `48`)
 - `DELETE_BATCH_SIZE` (default `50000`)
 - `MAX_DELETE_BATCHES_PER_HOUR` (default `10`)
