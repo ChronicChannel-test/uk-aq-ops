@@ -146,7 +146,7 @@ Optional GitHub repo variables:
 - `GCP_OPS_HISTORY_FLUSH_SERVICE_NAME` (default `uk-aq-history-outbox-flush-service`)
 - `GCP_OPS_HISTORY_FLUSH_RUNTIME_SERVICE_ACCOUNT` (default `uk-aq-ops-job@<project>.iam.gserviceaccount.com`)
 - `GCP_OPS_HISTORY_FLUSH_SCHEDULER_SERVICE_ACCOUNT` (default runtime SA)
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_ENABLED` (default `true`)
+- `GCP_HISTORY_OUTBOX_SCHEDULER_ENABLED` (default `true`)
 - `GCP_OPS_HISTORY_FLUSH_SCHEDULER_JOB_NAME` (default `uk-aq-history-outbox-flush-trigger`)
 - `GCP_OPS_HISTORY_FLUSH_SCHEDULER_CRON` (default `*/10 * * * *`)
 - `GCP_OPS_HISTORY_FLUSH_SCHEDULER_TIMEZONE` (default `Etc/UTC`)
@@ -154,6 +154,10 @@ Optional GitHub repo variables:
 - `GCP_OPS_HISTORY_FLUSH_MAX_FLUSH_BATCHES` (default `30`)
 - `SB_SECRET_KEY_SECRET_NAME` (default `SB_SECRET_KEY`)
 - `HISTORY_SECRET_KEY_SECRET_NAME` (default `HISTORY_SECRET_KEY`)
+
+Backwards-compatible alias still supported:
+
+- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_ENABLED`
 
 Optional fallback GitHub secret:
 
