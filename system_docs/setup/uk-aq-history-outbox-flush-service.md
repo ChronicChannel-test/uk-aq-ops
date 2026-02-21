@@ -143,21 +143,19 @@ Optional GitHub repo variables:
 
 - `GCP_REGION` (default `europe-west2`)
 - `GCP_ARTIFACT_REPO` (default `uk-aq`)
-- `GCP_OPS_HISTORY_FLUSH_SERVICE_NAME` (default `uk-aq-history-outbox-flush-service`)
-- `GCP_OPS_HISTORY_FLUSH_RUNTIME_SERVICE_ACCOUNT` (default `uk-aq-ops-job@<project>.iam.gserviceaccount.com`)
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_SERVICE_ACCOUNT` (default runtime SA)
+- `HISTORY_OUTBOX_FLUSH_SERVICE_NAME` (default `uk-aq-history-outbox-flush-service`)
+- `HISTORY_OUTBOX_FLUSH_RUNTIME_SERVICE_ACCOUNT` (default `uk-aq-ops-job@<project>.iam.gserviceaccount.com`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_SERVICE_ACCOUNT` (default runtime SA)
 - `GCP_HISTORY_OUTBOX_SCHEDULER_ENABLED` (default `true`)
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_JOB_NAME` (default `uk-aq-history-outbox-flush-trigger`)
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_CRON` (default `*/10 * * * *`)
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_TIMEZONE` (default `Etc/UTC`)
-- `GCP_OPS_HISTORY_FLUSH_CLAIM_BATCH_LIMIT` (default `20`)
-- `GCP_OPS_HISTORY_FLUSH_MAX_FLUSH_BATCHES` (default `30`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_ENABLED` (default `true`, optional alternative to `GCP_HISTORY_OUTBOX_SCHEDULER_ENABLED`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_JOB_NAME` (default `uk-aq-history-outbox-flush-trigger`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_CRON` (default `*/10 * * * *`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_TIMEZONE` (default `Etc/UTC`)
+- `HISTORY_OUTBOX_FLUSH_SCHEDULER_MAX_RETRY_ATTEMPTS` (default `0`)
+- `HISTORY_OUTBOX_FLUSH_CLAIM_BATCH_LIMIT` (default `20`)
+- `HISTORY_OUTBOX_FLUSH_MAX_FLUSH_BATCHES` (default `30`)
 - `SB_SECRET_KEY_SECRET_NAME` (default `SB_SECRET_KEY`)
 - `HISTORY_SECRET_KEY_SECRET_NAME` (default `HISTORY_SECRET_KEY`)
-
-Backwards-compatible alias still supported:
-
-- `GCP_OPS_HISTORY_FLUSH_SCHEDULER_ENABLED`
 
 Optional fallback GitHub secret:
 
