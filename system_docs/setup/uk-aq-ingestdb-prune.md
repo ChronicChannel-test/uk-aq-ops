@@ -39,7 +39,7 @@ Comparison scope rule:
 
 ## Dry-run behavior
 
-When `DRY_RUN=true`, no delete RPC is called.
+When `INGESTDB_PRUNE_DRY_RUN=true`, no delete RPC is called.
 
 If `REPAIR_ONE_MISMATCH_BUCKET=true`, dry-run also runs a repair pilot for one mismatch bucket:
 
@@ -61,7 +61,7 @@ Important:
 
 ## Live delete behavior
 
-When `DRY_RUN=false`, the flow is:
+When `INGESTDB_PRUNE_DRY_RUN=false`, the flow is:
 
 1. First compare pass and first delete pass:
 - delete all buckets that already match
@@ -115,7 +115,7 @@ Required:
 
 Key optional controls:
 
-- `DRY_RUN` (default `true`)
+- `INGESTDB_PRUNE_DRY_RUN` (default `true`)
 - `INGESTDB_RETENTION_DAYS` (default `7`)
 - `MAX_HOURS_PER_RUN` (default `48`)
 - `DELETE_BATCH_SIZE` (default `50000`)
