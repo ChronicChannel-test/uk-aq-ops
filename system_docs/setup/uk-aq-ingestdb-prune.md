@@ -16,6 +16,7 @@ Bucket key is:
 1. Build UTC window:
 - `window_end = UTC midnight today - INGESTDB_RETENTION_DAYS`
 - `window_start = window_end - MAX_HOURS_PER_RUN`
+- If `MAX_HOURS_PER_RUN > 24`, split into sequential 24-hour internal batches and process each batch in order.
 
 2. Fetch hourly summaries via RPC from both DBs:
 - ingest: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
@@ -97,6 +98,10 @@ Each bucket is deleted in bounded batches until:
 ## Logging details
 
 - Logs are structured JSON on Cloud Run stdout/stderr and appear in Cloud Logging.
+- For batched runs (`MAX_HOURS_PER_RUN > 24`), the service logs:
+  - `ingestdb_prune_batch_plan` at run start
+  - per-batch `ingestdb_prune_run_start`
+  - one final aggregate summary event (`ingestdb_prune_dry_run_batched_summary` or `ingestdb_prune_delete_batched_summary`)
 - History-only buckets (present in history, missing in ingest) are logged once per run as:
   - `severity=INFO`
   - `event=history_extra_buckets`
