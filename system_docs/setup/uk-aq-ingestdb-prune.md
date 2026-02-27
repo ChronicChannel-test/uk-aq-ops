@@ -98,6 +98,13 @@ Each bucket is deleted in bounded batches until:
 ## Logging details
 
 - Logs are structured JSON on Cloud Run stdout/stderr and appear in Cloud Logging.
+- On fatal run errors (`ingestdb_prune_run_error`, HTTP `500`), the service also attempts a Dropbox error upload when Dropbox env/secrets are configured.
+- Dropbox error path format: `<UK_AQ_DROPBOX_ROOT>/error_log/YYYY-MM-DD/uk_aq_error_cloud_run_ingestdb_prune_<timestamp>_<uuid>.json`.
+- Dropbox upload uses:
+  - `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`
+  - optional `UK_AQ_DROPBOX_ROOT`
+  - optional `UK_AIR_ERROR_DROPBOX_FOLDER` (default `/error_log`)
+  - optional allowlist gate `UK_AIR_ERROR_DROPBOX_ALLOWED_SUPABASE_URL` (must match `SUPABASE_URL`/`SB_URL` when set)
 - For batched runs (`MAX_HOURS_PER_RUN > 24`), the service logs:
   - `ingestdb_prune_batch_plan` at run start
   - per-batch `ingestdb_prune_run_start`
