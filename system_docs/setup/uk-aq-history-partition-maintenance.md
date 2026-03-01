@@ -5,9 +5,9 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_history.observa
 ## Runtime behavior
 
 `POST /run` performs:
-- create/ensure UTC-day partitions through `today + 7 days`
+- create/ensure UTC-day partitions through `today + 3 days`
 - enforce hot/cold index policy
-  - hot: today + previous 2 UTC days -> unique btree on `(connector_id, timeseries_id, observed_at)` + BRIN(observed_at)
+  - hot: previous 2 UTC days + today + next 3 UTC days -> unique btree on `(connector_id, timeseries_id, observed_at)` + BRIN(observed_at)
   - cold: BRIN(observed_at) only
 - default partition diagnostics (`count`, min/max observed_at, top offenders)
 - retention drops based on DST-aware cutoff from Europe/London local days (`31 complete local days + today`)
@@ -24,7 +24,7 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_history.observa
 ## Optional environment variables
 
 Partition policy controls:
-- `HISTORY_PARTITIONS_FUTURE_DAYS` (default `7`)
+- `HISTORY_PARTITIONS_FUTURE_DAYS` (policy-fixed to `3`)
 - `HISTORY_PARTITIONS_HOT_DAYS` (default `3`)
 - `HISTORY_COMPLETE_LOCAL_DAYS` (default `31`)
 - `HISTORY_DEFAULT_TOP_N` (default `20`)
