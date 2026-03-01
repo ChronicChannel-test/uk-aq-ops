@@ -21,6 +21,8 @@ Bucket key is:
 2. Fetch hourly summaries via RPC from both DBs:
 - ingest: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
 - history: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
+- Hash inputs include `connector_id`, `timeseries_id`, `observed_at`, `value`, and status.
+  History normalizes status via `uk_aq_history.status_codes.code` (`observations.status_id` -> `status_codes.code`) for parity with ingest text status values.
 
 3. Compare buckets by `(connector_id, hour_start)`:
 - missing in history -> mismatch
