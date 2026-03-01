@@ -53,7 +53,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --region "$REGION" \
   --source . \
   --command node \
-  --args src/history_outbox_flush_service.mjs \
+  --args workers/uk_aq_history_outbox_flush_service/server.mjs \
   --service-account "$OPS_SA_EMAIL" \
   --no-allow-unauthenticated \
   --cpu 1 \

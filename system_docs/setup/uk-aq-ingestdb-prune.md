@@ -146,4 +146,4 @@ Key optional controls:
 For deployment and scheduler wiring, use:
 
 - `README.md`
-- `.github/workflows/uk_aq_ingestdb_prune_cloud_run_deploy.yml`
+- `.github/workflows/uk_aq_prune_daily_cloud_run_deploy.yml`

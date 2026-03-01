@@ -39,12 +39,12 @@ Dropbox logging:
 - `DROPBOX_REFRESH_TOKEN`
 
 Cloudflare R2 backup-check placeholders (S3-compatible API):
-- `HISTORY_R2_ENDPOINT` (or `R2_ENDPOINT`)
-- `HISTORY_R2_BUCKET` (or `R2_BUCKET`)
-- `HISTORY_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
-- `HISTORY_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
-- `HISTORY_R2_REGION` (or `R2_REGION`, default `auto`)
-- `HISTORY_R2_OBSERVATIONS_PREFIX` (or `R2_OBSERVATIONS_PREFIX`, default `uk_aq_history/observations`)
+- `CFLARE_R2_ENDPOINT` (or `R2_ENDPOINT`)
+- `CFLARE_R2_BUCKET` (or `R2_BUCKET`)
+- `CFLARE_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
+- `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
+- `CFLARE_R2_REGION` (or `R2_REGION`, default `auto`)
+- `CFLARE_R2_OBSERVATIONS_PREFIX` (or `R2_OBSERVATIONS_PREFIX`, default `uk_aq_history/observations`)
 
 ## Local run
 
