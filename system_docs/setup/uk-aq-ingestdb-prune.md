@@ -142,6 +142,7 @@ Key optional controls:
 
 - `sql/ingest_db_ops_rpcs.sql`
 - `sql/history_db_ops_rpcs.sql`
+- Fingerprint RPCs depend on `pgcrypto.digest`; keep `pgcrypto` installed and accessible via function `search_path` (for example `extensions` and/or `public`).
 
 For deployment and scheduler wiring, use:
 
