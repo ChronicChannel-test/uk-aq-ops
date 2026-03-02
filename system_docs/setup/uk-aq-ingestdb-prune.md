@@ -18,6 +18,15 @@ Bucket key is:
 - `window_start = window_end - MAX_HOURS_PER_RUN`
 - If `MAX_HOURS_PER_RUN > 24`, split into sequential 24-hour internal batches and process each batch in order.
 
+0. Phase B pre-prune backup gate:
+- Before fingerprint compare/delete work, the service runs Phase B backup for closed UTC days (`day_utc <= utc_today - 8 days`).
+- Source rows are streamed from `uk_aq_core.observations` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
+- Part rollover defaults to `1,000,000` rows per file.
+- Backup writes to staging first (`backup/staging/run_id=...`) then copies to committed prefix (`backup/observations/...`), writes manifests, verifies object existence, and updates:
+  - `uk_aq_ops.backup_candidates`
+  - `uk_aq_ops.prune_day_gates.backup_done`
+- Prune deletion for an hour bucket is allowed only when that bucket day has `backup_done=true`.
+
 2. Fetch hourly summaries via RPC from both DBs:
 - ingest: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
 - history: `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint`
@@ -137,6 +146,25 @@ Key optional controls:
 - `REPAIR_BUCKET_OUTBOX_CHUNK_SIZE` (default `1000`)
 - `FLUSH_CLAIM_BATCH_LIMIT` (default `20`)
 - `MAX_FLUSH_BATCHES` (default `30`)
+- `BACKUP_PHASE_B_ENABLED` (default `true`)
+- `BACKUP_PART_MAX_ROWS` (default `1000000`)
+- `BACKUP_CURSOR_FETCH_ROWS` (default `20000`)
+- `BACKUP_ROW_GROUP_SIZE` (default `100000`)
+- `BACKUP_MAX_CANDIDATES_PER_RUN` (default `500`)
+- `BACKUP_STAGING_RETENTION_DAYS` (default `7`)
+- `BACKUP_STAGING_PREFIX` (default `backup/staging`)
+- `BACKUP_COMMITTED_PREFIX` (default `backup/observations`)
+- `BACKUP_RUNS_PREFIX` (default `backup/runs`)
+- `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
+
+Phase B required env/secrets:
+
+- `SUPABASE_DB_URL` (direct Postgres URL for streaming cursor reads)
+- `CFLARE_R2_ENDPOINT`
+- `CFLARE_R2_REGION` (default `auto`)
+- bucket mapping: `R2_BUCKET_PROD` / `R2_BUCKET_STAGE` / `R2_BUCKET_DEV` (or fallback `CFLARE_R2_BUCKET`)
+- `CFLARE_R2_ACCESS_KEY_ID`
+- `CFLARE_R2_SECRET_ACCESS_KEY`
 
 ## Related SQL scripts
 
