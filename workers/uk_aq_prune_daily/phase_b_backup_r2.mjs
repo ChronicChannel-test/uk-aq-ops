@@ -173,19 +173,6 @@ function statsFromFileEntries(fileEntries, totalRows) {
     }
   }
 
-
-  let minBytes = bytes[0];
-  let maxBytes = bytes[0];
-    min_file_bytes: minBytes,
-    max_file_bytes: maxBytes,
-    if (value < minBytes) {
-      minBytes = value;
-    }
-    if (value > maxBytes) {
-      maxBytes = value;
-    }
-  }
-
   return {
     bytes_per_row_estimate: totalRows > 0 ? totalBytes / Number(totalRows) : null,
     avg_file_bytes: averageNumber(totalBytes, bytes.length),
@@ -704,23 +691,13 @@ function createDayManifest({ dayUtc, runId, connectorManifests, writerGitSha, ba
       connector_id: manifest.connector_id,
       manifest_key: manifest.manifest_key,
       source_row_count: manifest.source_row_count,
-const PARQUET_WRITER_PROPERTIES_CACHE = new Map();
-
       file_count: manifest.file_count,
-  const key = Number(rowGroupSize);
-  if (PARQUET_WRITER_PROPERTIES_CACHE.has(key)) {
-    return PARQUET_WRITER_PROPERTIES_CACHE.get(key);
-  }
-
       total_bytes: manifest.total_bytes,
-  const writerProperties = new parquetWasm.WriterPropertiesBuilder()
+    })),
     backup_schema_name: BACKUP_SCHEMA_NAME,
-    .setMaxRowGroupSize(key)
+    backup_schema_version: BACKUP_SCHEMA_VERSION,
     columns: BACKUP_OBSERVATIONS_COLUMNS_V1,
     writer_version: WRITER_VERSION,
-
-  PARQUET_WRITER_PROPERTIES_CACHE.set(key, writerProperties);
-  return writerProperties;
     writer_git_sha: writerGitSha,
     ...stats,
     backed_up_at_utc: backedUpAtUtc,
@@ -1023,10 +1000,10 @@ async function finalizeDayGateIfReady({ client, runtime, dayUtc }) {
   const totalBytes = dayCandidates.reduce(
     (sum, row) => sum + (row.backup_total_bytes || 0n),
     0n,
-  const thresholdMs = (Date.now() - (runtime.staging_retention_days * DAY_MS));
+  );
 
   await updateDayGateComplete(client, {
-    prefix: `${runtime.staging_prefix}/`,
+    dayUtc,
     runId: runtime.run_id,
     manifestKey: dayManifestKey,
     rowCount: totalRows,
