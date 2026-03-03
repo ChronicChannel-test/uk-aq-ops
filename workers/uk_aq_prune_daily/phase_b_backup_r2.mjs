@@ -691,13 +691,23 @@ function createDayManifest({ dayUtc, runId, connectorManifests, writerGitSha, ba
       connector_id: manifest.connector_id,
       manifest_key: manifest.manifest_key,
       source_row_count: manifest.source_row_count,
+const PARQUET_WRITER_PROPERTIES_CACHE = new Map();
+
       file_count: manifest.file_count,
+  const key = Number(rowGroupSize);
+  if (PARQUET_WRITER_PROPERTIES_CACHE.has(key)) {
+    return PARQUET_WRITER_PROPERTIES_CACHE.get(key);
+  }
+
       total_bytes: manifest.total_bytes,
-    })),
+  const writerProperties = new parquetWasm.WriterPropertiesBuilder()
     backup_schema_name: BACKUP_SCHEMA_NAME,
-    backup_schema_version: BACKUP_SCHEMA_VERSION,
+    .setMaxRowGroupSize(key)
     columns: BACKUP_OBSERVATIONS_COLUMNS_V1,
     writer_version: WRITER_VERSION,
+
+  PARQUET_WRITER_PROPERTIES_CACHE.set(key, writerProperties);
+  return writerProperties;
     writer_git_sha: writerGitSha,
     ...stats,
     backed_up_at_utc: backedUpAtUtc,
