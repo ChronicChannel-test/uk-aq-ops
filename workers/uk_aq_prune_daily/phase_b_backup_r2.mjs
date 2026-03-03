@@ -1000,7 +1000,7 @@ async function finalizeDayGateIfReady({ client, runtime, dayUtc }) {
   const totalBytes = dayCandidates.reduce(
     (sum, row) => sum + (row.backup_total_bytes || 0n),
     0n,
-  );
+  const thresholdMs = (Date.now() - (runtime.staging_retention_days * DAY_MS));
 
   await updateDayGateComplete(client, {
     prefix: `${runtime.staging_prefix}/`,
