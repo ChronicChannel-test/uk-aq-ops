@@ -20,11 +20,13 @@ Bucket key is:
 
 0. Phase B pre-prune backup gate:
 - Before fingerprint compare/delete work, the service runs Phase B backup for closed UTC days (`day_utc <= utc_today - 8 days`).
-- Source rows are streamed from `uk_aq_core.observations` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
+- Source rows are streamed through server-side projection function `uk_aq_ops.uk_aq_phase_b_backup_rows` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
 - Part rollover defaults to `1,000,000` rows per file.
-- Backup writes to staging first (`backup/staging/run_id=...`) then copies to committed prefix (`backup/observations/...`), writes manifests, verifies object existence, and updates:
+- Backup writes each part directly to committed prefix (`backup/observations/...`) and persists resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
+- Backup writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.backup_candidates`
   - `uk_aq_ops.prune_day_gates.backup_done`
+- Legacy staging objects are still cleaned up by retention policy (`backup/staging/...`) to drain old runs.
 - Prune deletion for an hour bucket is allowed only when that bucket day has `backup_done=true`.
 
 2. Fetch hourly summaries via RPC from both DBs:
