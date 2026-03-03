@@ -173,6 +173,19 @@ function statsFromFileEntries(fileEntries, totalRows) {
     }
   }
 
+
+  let minBytes = bytes[0];
+  let maxBytes = bytes[0];
+    min_file_bytes: minBytes,
+    max_file_bytes: maxBytes,
+    if (value < minBytes) {
+      minBytes = value;
+    }
+    if (value > maxBytes) {
+      maxBytes = value;
+    }
+  }
+
   return {
     bytes_per_row_estimate: totalRows > 0 ? totalBytes / Number(totalRows) : null,
     avg_file_bytes: averageNumber(totalBytes, bytes.length),
