@@ -1003,7 +1003,7 @@ async function finalizeDayGateIfReady({ client, runtime, dayUtc }) {
   );
 
   await updateDayGateComplete(client, {
-    dayUtc,
+    prefix: `${runtime.staging_prefix}/`,
     runId: runtime.run_id,
     manifestKey: dayManifestKey,
     rowCount: totalRows,
