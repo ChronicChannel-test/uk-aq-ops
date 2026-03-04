@@ -64,6 +64,8 @@ If `REPAIR_ONE_MISMATCH_BUCKET=true`, dry-run also runs a repair pilot for one m
 - upsert to history: `uk_aq_public.uk_aq_rpc_history_observations_upsert`
 - receipts upsert: `uk_aq_public.uk_aq_rpc_history_sync_receipt_daily_upsert`
 - resolve: `uk_aq_public.uk_aq_rpc_history_outbox_resolve`
+- upsert behavior is timeout-safe: retries transient errors, and on statement timeout recursively splits payload batches before failing.
+- duplicate rows across claimed outbox entries are de-duplicated in-memory by `(connector_id, timeseries_id, observed_at)` before history upsert.
 
 3. Recheck that same bucket with hourly fingerprint RPCs.
 

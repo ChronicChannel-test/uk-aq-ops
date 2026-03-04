@@ -2,6 +2,11 @@
 
 This deploys a dedicated Cloud Run service that flushes the ingest DB history outbox into history DB.
 
+Runtime behavior notes:
+
+- Flush claims outbox entries, de-duplicates rows by `(connector_id, timeseries_id, observed_at)`, and upserts to history.
+- History upsert is timeout-safe: transient retry plus recursive split on statement timeout before marking an entry failed.
+
 ## 1) Set variables
 
 ```bash
