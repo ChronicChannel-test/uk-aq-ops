@@ -40,6 +40,38 @@ When `GCP_AQI_STATION_AGGDAILY_SCHEDULER_ENABLED=true`, workflow manages 3 Sched
 
 All jobs call the same Cloud Run service URL with POST JSON payload.
 
+## Trigger Behavior (What Each Mode Computes)
+
+The service first calculates a **mature hour**:
+
+- `mature_hour = floor_utc_hour(now_utc - UK_AQ_AQI_MATURITY_DELAY_HOURS)`
+- default delay is 3 hours, so each run avoids very recent late-arriving data.
+
+Then each mode computes:
+
+- `fast`:
+  - processes exactly one hour: `[mature_hour, mature_hour + 1h)`
+  - used for near-real-time updates every 5 minutes.
+- `reconcile_short`:
+  - processes the last mature 36 hours (default):
+  - `[mature_hour - 35h, mature_hour + 1h)`
+  - catches normal late arrivals with low write churn.
+- `reconcile_deep`:
+  - processes the last mature 14 days (default):
+  - `[mature_hour - (14d * 24h - 1h), mature_hour + 1h)`
+  - catches slower/rare late data and provides daily deep reconciliation.
+
+Internal source read window:
+
+- each run reads source observations from `target_start - 23h` up to `target_end`
+- this is required so PM DAQI rolling-24h means can be calculated at the first target hour.
+
+Write/refresh behavior:
+
+- hourly rows are idempotent upserts in `station_aqi_hourly`
+- affected daily/monthly rollups are rebuilt idempotently
+- each run logs telemetry into `uk_aq_ops.aqi_compute_runs` and applies run-log retention cleanup.
+
 ## Default AQI Settings
 
 - `UK_AQ_AQI_MATURITY_DELAY_HOURS=3`
