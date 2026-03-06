@@ -65,6 +65,7 @@ Internal source read window:
 
 - each run reads source observations from `target_start - 23h` up to `target_end`
 - this is required so PM DAQI rolling-24h means can be calculated at the first target hour.
+- source RPC v1 returns hourly means + `sample_count` only (expected-count cadence completeness is deferred).
 
 Write/refresh behavior:
 
