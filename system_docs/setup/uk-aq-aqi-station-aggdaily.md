@@ -1,6 +1,8 @@
 # UK AQ Station AQI AggDaily Cloud Run Setup
 
-This service computes pollutant-specific DAQI + EAQI for stations and writes hourly + daily/monthly outputs into AggDaily DB.
+This service is now **sync-only**: it reads precomputed AQI helper rows from ingest DB and writes them to AggDaily DB (hourly upsert + daily/monthly rollups + run telemetry).
+
+AQI helper computation is scheduled in ingest DB via Supabase `pg_cron`.
 
 ## Runtime
 
@@ -30,59 +32,57 @@ Google auth (choose one):
 - WIF: `GCP_WORKLOAD_IDENTITY_PROVIDER` + `GCP_SERVICE_ACCOUNT`
 - SA key: `GCP_SA_KEY`
 
-## Default AQI Scheduling
+## Ingest Cron (Primary Compute)
 
-When `GCP_AQI_STATION_AGGDAILY_SCHEDULER_ENABLED=true`, workflow manages 3 Scheduler jobs:
+In ingest DB, `pg_cron` runs hourly at `:10`:
 
-- fast: `*/5 * * * *` (`run_mode=fast`)
-- short reconcile: `7 */2 * * *` (`run_mode=reconcile_short`)
-- deep reconcile: `17 3 * * *` (`run_mode=reconcile_deep`)
+- job: `uk_aq_ingest_station_aqi_hourly_helper_tick`
+- formula:
+  - `target_hour_end_utc = date_trunc('hour', now() - interval '3 hours 10 minutes')`
+- processing rule:
+  - use `> start AND <= end` hour-end windowing
 
-All jobs call the same Cloud Run service URL with POST JSON payload.
+This computes/upserts `uk_aq_aggdaily.station_aqi_hourly_helper` in ingest DB.
 
-## Trigger Behavior (What Each Mode Computes)
+## Cloud Scheduler (Sync Service)
 
-The service first calculates a **mature hour**:
+When `GCP_AQI_STATION_AGGDAILY_SCHEDULER_ENABLED=true`, workflow can manage sync triggers.
 
-- `mature_hour = floor_utc_hour(now_utc - UK_AQ_AQI_MATURITY_DELAY_HOURS)`
-- default delay is 3 hours, so each run avoids very recent late-arriving data.
+Default fast job:
 
-Then each mode computes:
+- fast sync: `20 * * * *` (`run_mode=fast`)
 
-- `fast`:
-  - processes exactly one hour: `[mature_hour, mature_hour + 1h)`
-  - used for near-real-time updates every 5 minutes.
-- `reconcile_short`:
-  - processes the last mature 36 hours (default):
-  - `[mature_hour - 35h, mature_hour + 1h)`
-  - catches normal late arrivals with low write churn.
-- `reconcile_deep`:
-  - processes the last mature 14 days (default):
-  - `[mature_hour - (14d * 24h - 1h), mature_hour + 1h)`
-  - catches slower/rare late data and provides daily deep reconciliation.
+Reconcile jobs remain available through the same service (`reconcile_short`, `reconcile_deep`) if enabled.
 
-Internal source read window:
+## Trigger Window Logic
 
-- each run reads source observations from `target_start - 23h` up to `target_end`
-- this is required so PM DAQI rolling-24h means can be calculated at the first target hour.
-- source RPC v1 returns hourly means + `sample_count` only (expected-count cadence completeness is deferred).
+Worker computes a mature **hour-end**:
 
-Write/refresh behavior:
+- `target_hour_end_utc = floor_utc_hour(now_utc - (UK_AQ_AQI_MATURITY_DELAY_HOURS + UK_AQ_AQI_MATURITY_DELAY_BUFFER_MINUTES))`
+- defaults: `3h` + `10m`
 
-- hourly rows are idempotent upserts in `station_aqi_hourly`
-- affected daily/monthly rollups are rebuilt idempotently
-- each run logs telemetry into `uk_aq_ops.aqi_compute_runs` and applies run-log retention cleanup.
+Mode windows:
+
+- `fast`: `(target_hour_end_utc - 1h, target_hour_end_utc]`
+- `reconcile_short`: trailing mature 36h hour-end window (default)
+- `reconcile_deep`: trailing mature 14d hour-end window (default)
+
+Sync behavior:
+
+- fetch helper rows from ingest RPC `uk_aq_rpc_station_aqi_hourly_helper_window`
+- upsert into AggDaily `station_aqi_hourly`
+- refresh daily/monthly rollups for affected window and stations
+- log run metrics to `uk_aq_ops.aqi_compute_runs` in AggDaily
 
 ## Default AQI Settings
 
 - `UK_AQ_AQI_MATURITY_DELAY_HOURS=3`
+- `UK_AQ_AQI_MATURITY_DELAY_BUFFER_MINUTES=10`
 - `UK_AQ_AQI_SHORT_LOOKBACK_HOURS=36`
 - `UK_AQ_AQI_DEEP_LOOKBACK_DAYS=14`
 - `UK_AQ_AQI_RUN_LOG_RETENTION_DAYS=7`
 
 ## Manual Run
-
-After deploy, execute one run via authenticated HTTP request body such as:
 
 ```json
 {"trigger_mode":"manual","run_mode":"fast"}
