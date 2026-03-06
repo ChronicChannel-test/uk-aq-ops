@@ -1,6 +1,6 @@
 # UK AQ Station AQI AggDaily Cloud Run Setup
 
-This service is now **sync-only**: it reads precomputed AQI helper rows from ingest DB and writes them to AggDaily DB (hourly upsert + daily/monthly rollups + run telemetry).
+This service is now **sync-only**: it reads precomputed station-hour helper rows from ingest DB and writes them to AggDaily DB (hourly upsert + daily/monthly rollups + run telemetry).
 
 AQI helper computation is scheduled in ingest DB via Supabase `pg_cron`.
 
@@ -43,6 +43,7 @@ In ingest DB, `pg_cron` runs hourly at `:10`:
   - use `> start AND <= end` hour-end windowing
 
 This computes/upserts `uk_aq_aggdaily.station_aqi_hourly_helper` in ingest DB.
+The helper stores station-hour means and sample counts; AQI index levels are computed in AggDaily during hourly upsert.
 
 ## Cloud Scheduler (Sync Service)
 
