@@ -46,13 +46,11 @@ This computes/upserts `uk_aq_aggdaily.station_aqi_hourly_helper` in ingest DB.
 
 ## Cloud Scheduler (Sync Service)
 
-When `GCP_AQI_STATION_AGGDAILY_SCHEDULER_ENABLED=true`, workflow can manage sync triggers.
+When `GCP_AQI_STATION_AGGDAILY_SCHEDULER_ENABLED=true`, workflow manages a single hourly sync trigger:
 
-Default fast job:
-
-- fast sync: `20 * * * *` (`run_mode=fast`)
-
-Reconcile jobs remain available through the same service (`reconcile_short`, `reconcile_deep`) if enabled.
+- job: `uk-aq-aqi-station-aggdaily-sync-hourly`
+- schedule: `20 * * * *`
+- payload: `{"trigger_mode":"scheduler","run_mode":"sync_hourly"}`
 
 ## Trigger Window Logic
 
@@ -63,9 +61,8 @@ Worker computes a mature **hour-end**:
 
 Mode windows:
 
-- `fast`: `(target_hour_end_utc - 1h, target_hour_end_utc]`
-- `reconcile_short`: trailing mature 36h hour-end window (default)
-- `reconcile_deep`: trailing mature 14d hour-end window (default)
+- `sync_hourly`: `(target_hour_end_utc - 1h, target_hour_end_utc]`
+- `backfill`: explicit window from manual `from_hour_utc`/`to_hour_utc`
 
 Sync behavior:
 
@@ -78,14 +75,12 @@ Sync behavior:
 
 - `UK_AQ_AQI_MATURITY_DELAY_HOURS=3`
 - `UK_AQ_AQI_MATURITY_DELAY_BUFFER_MINUTES=10`
-- `UK_AQ_AQI_SHORT_LOOKBACK_HOURS=36`
-- `UK_AQ_AQI_DEEP_LOOKBACK_DAYS=14`
 - `UK_AQ_AQI_RUN_LOG_RETENTION_DAYS=7`
 
 ## Manual Run
 
 ```json
-{"trigger_mode":"manual","run_mode":"fast"}
+{"trigger_mode":"manual","run_mode":"sync_hourly"}
 ```
 
 Backfill example:
