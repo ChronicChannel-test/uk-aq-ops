@@ -172,8 +172,8 @@ Phase B required env/secrets:
 
 ## Related SQL scripts
 
-- `sql/ingest_db_ops_rpcs.sql`
-- `sql/history_db_ops_rpcs.sql`
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/ingest_db/ingest_db_ops_rpcs.sql`
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/history_db/history_db_ops_rpcs.sql`
 - Fingerprint RPCs depend on `pgcrypto.digest`; keep `pgcrypto` installed and accessible via function `search_path` (for example `extensions` and/or `public`).
 
 For deployment and scheduler wiring, use:

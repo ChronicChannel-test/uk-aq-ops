@@ -75,7 +75,7 @@ Target service endpoint:
 ## SQL prerequisites
 
 Apply in history DB:
-- `sql/history_db_ops_rpcs.sql`
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/history_db/history_db_ops_rpcs.sql`
 
 The service expects these RPCs to exist:
 - `uk_aq_public.uk_aq_rpc_history_ensure_daily_partitions`
