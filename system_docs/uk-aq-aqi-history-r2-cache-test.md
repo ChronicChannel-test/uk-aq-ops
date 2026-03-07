@@ -18,6 +18,7 @@ Website repo:
 
 - Test page:
   - `uk_aq_history_r2_cache_test.html`
+  - `uk_aq_history_r2_vs_supabase_test.html`
 
 ## R2 Test Prefix
 
@@ -44,6 +45,7 @@ Grains:
 
 - `GET /v1/aqi-history/manifest`
 - `GET /v1/aqi-history/data`
+- `GET /v1/aqi-history/supabase-data`
 
 Aliases:
 
@@ -57,6 +59,12 @@ Query params:
 - `entity` (or `entity_id`)
 - `v` (optional cache-buster)
 - `prefix` (optional R2 prefix override, defaults to `AQI_R2_TEST_PREFIX`)
+- `row_limit` (optional)
+
+Supabase endpoint params:
+
+- `entity` / `entity_id` / `station_id`
+- `from_utc` / `to_utc` (optional)
 - `row_limit` (optional)
 
 ## Generate/Regenerate Test Data
@@ -103,6 +111,12 @@ Set `api_base` query param to your deployed worker URL. Example:
 
 ```text
 uk_aq_history_r2_cache_test.html?api_base=https://uk-aq-aqi-history-r2-test.<workers-subdomain>.workers.dev/v1/aqi-history
+```
+
+R2 vs Supabase page:
+
+```text
+uk_aq_history_r2_vs_supabase_test.html?api_base=https://uk-aq-aqi-history-r2-test.<workers-subdomain>.workers.dev/v1/aqi-history&prefix=aqi-r2-test/v1-year-hourly-test
 ```
 
 Then:
