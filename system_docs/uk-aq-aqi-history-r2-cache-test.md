@@ -56,6 +56,7 @@ Query params:
 - `grain` (`hourly|daily|monthly`)
 - `entity` (or `entity_id`)
 - `v` (optional cache-buster)
+- `prefix` (optional R2 prefix override, defaults to `AQI_R2_TEST_PREFIX`)
 - `row_limit` (optional)
 
 ## Generate/Regenerate Test Data
