@@ -99,7 +99,7 @@ Core controls:
 - `UK_AQ_BACKFILL_FORCE_REPLACE=true|false`
 - `UK_AQ_BACKFILL_FROM_DAY_UTC=YYYY-MM-DD`
 - `UK_AQ_BACKFILL_TO_DAY_UTC=YYYY-MM-DD`
-- `UK_AQ_BACKFILL_CONNECTOR_IDS_CSV=4,7,11`
+- `UK_AQ_BACKFILL_CONNECTOR_IDS=4,7,11`
 - `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK=true|false`
 
 Retention / window controls:
@@ -113,6 +113,8 @@ RPC tuning controls:
 - `UK_AQ_BACKFILL_RPC_RETRIES` (default `3`)
 - `UK_AQ_BACKFILL_HOURLY_UPSERT_CHUNK_SIZE` (default `2000`)
 - `UK_AQ_BACKFILL_STATION_ID_PAGE_SIZE` (default `1000`)
+- `UK_AQ_BACKFILL_SOURCE_RPC_PAGE_SIZE` (default `1000`)
+- `UK_AQ_BACKFILL_SOURCE_RPC_MAX_PAGES` (default `200`)
 
 Ledger controls:
 
@@ -132,7 +134,10 @@ The helper computes a rolling local-day window in `UK_AQ_BACKFILL_LOCAL_TIMEZONE
 
 For persistent run/day/checkpoint/error tracking in AggDaily DB:
 
-- Apply `workers/uk_aq_backfill_cloud_run/sql/uk_aq_backfill_ops_aggdaily.sql`
+- Apply schema-repo SQL (canonical):
+  - `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/aggdaily_db/uk_aq_backfill_ops_aggdaily.sql`
+- The tables are also included in:
+  - `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/aggdaily_db/uk_aq_aggdaily_schema.sql`
 
 Tables:
 
@@ -268,7 +273,7 @@ UK_AQ_BACKFILL_TRIGGER_MODE=manual \
 UK_AQ_BACKFILL_DRY_RUN=true \
 UK_AQ_BACKFILL_FROM_DAY_UTC=2026-02-01 \
 UK_AQ_BACKFILL_TO_DAY_UTC=2026-02-05 \
-UK_AQ_BACKFILL_CONNECTOR_IDS_CSV=4,7 \
+UK_AQ_BACKFILL_CONNECTOR_IDS=4,7 \
 deno run --allow-env --allow-net --allow-read --allow-write --allow-run \
   workers/uk_aq_backfill_cloud_run/run_job.ts
 ```
@@ -281,3 +286,43 @@ gcloud scheduler jobs run "<backfill-scheduler-job-name>" \
 ```
 
 The scheduler job payload defaults to `local_to_aggdaily` unless workflow vars override it.
+
+### 12) Use ops helper script with required pre-set parameters
+
+Script path:
+
+- `scripts/gcp/uk_aq_backfill_cloud_run_call.sh`
+
+The script enforces required parameters before making the call.
+
+Required env vars:
+
+- `UK_AQ_BACKFILL_SERVICE_URL`
+- `UK_AQ_BACKFILL_TRIGGER_MODE` (`manual|scheduler`)
+- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aggdaily|history_to_r2|source_to_all`)
+- `UK_AQ_BACKFILL_DRY_RUN` (`true|false`)
+- `UK_AQ_BACKFILL_FORCE_REPLACE` (`true|false`)
+- `UK_AQ_BACKFILL_FROM_DAY_UTC` (`YYYY-MM-DD`)
+- `UK_AQ_BACKFILL_TO_DAY_UTC` (`YYYY-MM-DD`)
+
+Optional:
+
+- `UK_AQ_BACKFILL_CONNECTOR_IDS` (for example `4,7`)
+- `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK` (`true|false`, default `false`)
+- `UK_AQ_BACKFILL_REQUEST_TIMEOUT_SECONDS` (default `300`)
+- `UK_AQ_BACKFILL_ID_TOKEN` (if omitted, script first tries `gcloud auth print-identity-token --audiences "${UK_AQ_BACKFILL_SERVICE_URL}"`, then falls back to `gcloud auth print-identity-token`)
+
+Example:
+
+```bash
+export UK_AQ_BACKFILL_SERVICE_URL="${SERVICE_URL}"
+export UK_AQ_BACKFILL_TRIGGER_MODE="manual"
+export UK_AQ_BACKFILL_RUN_MODE="local_to_aggdaily"
+export UK_AQ_BACKFILL_DRY_RUN="false"
+export UK_AQ_BACKFILL_FORCE_REPLACE="true"
+export UK_AQ_BACKFILL_FROM_DAY_UTC="2026-02-01"
+export UK_AQ_BACKFILL_TO_DAY_UTC="2026-02-01"
+export UK_AQ_BACKFILL_CONNECTOR_IDS="4"
+
+./scripts/gcp/uk_aq_backfill_cloud_run_call.sh
+```
