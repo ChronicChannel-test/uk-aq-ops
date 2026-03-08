@@ -11,10 +11,9 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
   - cold: BRIN(observed_at) only
 - default partition diagnostics (`count`, min/max observed_at, top offenders)
 - retention drops based on DST-aware cutoff from Europe/London local days (`31 complete local days + today`)
-- backup gate before each drop:
-  - HEAD `_SUCCESS` marker in Cloudflare R2
-  - fallback list-prefix requiring at least one `.parquet`
-  - if not confirmed, skip drop and log `SKIP DROP — backup not confirmed`
+- R2 History manifest gate before each drop:
+  - HEAD `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json` in Cloudflare R2
+  - if not confirmed, skip drop and log `SKIP DROP — history manifest not confirmed`
 
 ## Required environment variables
 
@@ -38,13 +37,13 @@ Dropbox logging:
 - `DROPBOX_APP_SECRET`
 - `DROPBOX_REFRESH_TOKEN`
 
-Cloudflare R2 backup-check placeholders (S3-compatible API):
+Cloudflare R2 history-check placeholders (S3-compatible API):
 - `CFLARE_R2_ENDPOINT` (or `R2_ENDPOINT`)
 - `CFLARE_R2_BUCKET` (or `R2_BUCKET`)
 - `CFLARE_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
 - `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
 - `CFLARE_R2_REGION` (or `R2_REGION`, default `auto`)
-- `CFLARE_R2_OBSERVATIONS_PREFIX` (or `R2_OBSERVATIONS_PREFIX`, default `history/v1/observations`)
+- `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 
 ## Local run
 
