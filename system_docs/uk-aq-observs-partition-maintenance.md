@@ -1,6 +1,6 @@
-# uk-aq-history-partition-maintenance setup (Cloud Run + Scheduler)
+# uk-aq-observs-partition-maintenance setup (Cloud Run + Scheduler)
 
-This deploys a dedicated Cloud Run service that maintains `uk_aq_history.observations` partitions in history DB.
+This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observations` partitions in `obs_aqidb`.
 
 ## Runtime behavior
 
@@ -18,21 +18,21 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_history.observa
 
 ## Required environment variables
 
-- `HISTORY_SUPABASE_URL` (or `HISTORY_URL`)
-- `HISTORY_SECRET_KEY`
+- `OBS_AQIDB_SUPABASE_URL`
+- `OBS_AQIDB_SECRET_KEY`
 
 ## Optional environment variables
 
 Partition policy controls:
-- `HISTORY_PARTITIONS_FUTURE_DAYS` (policy-fixed to `3`)
-- `HISTORY_PARTITIONS_HOT_DAYS` (default `3`)
-- `HISTORY_COMPLETE_LOCAL_DAYS` (default `31`)
-- `HISTORY_DEFAULT_TOP_N` (default `20`)
-- `HISTORY_PARTITION_DROP_DRY_RUN` (default `false`)
+- `OBSERVS_PARTITIONS_FUTURE_DAYS` (policy-fixed to `3`)
+- `OBSERVS_PARTITIONS_HOT_DAYS` (default `3`)
+- `OBSERVS_COMPLETE_LOCAL_DAYS` (default `31`)
+- `OBSERVS_DEFAULT_TOP_N` (default `20`)
+- `OBSERVS_PARTITION_DROP_DRY_RUN` (default `false`)
 
 Dropbox logging:
 - `UK_AQ_DROPBOX_ROOT` (optional)
-- `UK_AQ_HISTORY_PARTITION_DROPBOX_FOLDER` (default `/history_partition_maintenance`)
+- `UK_AQ_OBSERVS_PARTITION_DROPBOX_FOLDER` (default `/observs_partition_maintenance`)
 - `UK_AIR_ERROR_DROPBOX_ALLOWED_SUPABASE_URL` (optional allowlist)
 - `DROPBOX_APP_KEY`
 - `DROPBOX_APP_SECRET`
@@ -44,13 +44,13 @@ Cloudflare R2 backup-check placeholders (S3-compatible API):
 - `CFLARE_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
 - `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
 - `CFLARE_R2_REGION` (or `R2_REGION`, default `auto`)
-- `CFLARE_R2_OBSERVATIONS_PREFIX` (or `R2_OBSERVATIONS_PREFIX`, default `uk_aq_history/observations`)
+- `CFLARE_R2_OBSERVATIONS_PREFIX` (or `R2_OBSERVATIONS_PREFIX`, default `history/v1/observations`)
 
 ## Local run
 
 ```bash
 npm install
-npm run start:history-partitions
+npm run start:observs-partitions
 ```
 
 Run once:
@@ -74,12 +74,12 @@ Target service endpoint:
 
 ## SQL prerequisites
 
-Apply in history DB:
-- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/history_db/history_db_ops_rpcs.sql`
+Apply in obs_aqidb:
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/observs_db/observs_db_ops_rpcs.sql`
 
 The service expects these RPCs to exist:
-- `uk_aq_public.uk_aq_rpc_history_ensure_daily_partitions`
-- `uk_aq_public.uk_aq_rpc_history_enforce_hot_cold_indexes`
-- `uk_aq_public.uk_aq_rpc_history_observations_default_diagnostics`
-- `uk_aq_public.uk_aq_rpc_history_drop_candidates`
-- `uk_aq_public.uk_aq_rpc_history_drop_partition`
+- `uk_aq_public.uk_aq_rpc_observs_ensure_daily_partitions`
+- `uk_aq_public.uk_aq_rpc_observs_enforce_hot_cold_indexes`
+- `uk_aq_public.uk_aq_rpc_observs_observations_default_diagnostics`
+- `uk_aq_public.uk_aq_rpc_observs_drop_candidates`
+- `uk_aq_public.uk_aq_rpc_observs_drop_partition`

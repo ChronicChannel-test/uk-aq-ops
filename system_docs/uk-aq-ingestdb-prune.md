@@ -57,13 +57,13 @@ When `INGESTDB_PRUNE_DRY_RUN=true`, no delete RPC is called.
 If `REPAIR_ONE_MISMATCH_BUCKET=true`, dry-run also runs a repair pilot for one mismatch bucket:
 
 1. Enqueue that bucket’s rows to ingest outbox via:
-- `uk_aq_public.uk_aq_rpc_history_outbox_enqueue_hour_bucket`
+- `uk_aq_public.uk_aq_rpc_observs_outbox_enqueue_hour_bucket`
 
 2. Flush outbox immediately, inside the prune run itself:
-- claim: `uk_aq_public.uk_aq_rpc_history_outbox_claim`
-- upsert to history: `uk_aq_public.uk_aq_rpc_history_observations_upsert`
-- receipts upsert: `uk_aq_public.uk_aq_rpc_history_sync_receipt_daily_upsert`
-- resolve: `uk_aq_public.uk_aq_rpc_history_outbox_resolve`
+- claim: `uk_aq_public.uk_aq_rpc_observs_outbox_claim`
+- upsert to history: `uk_aq_public.uk_aq_rpc_observs_observations_upsert`
+- receipts upsert: `uk_aq_public.uk_aq_rpc_observs_sync_receipt_daily_upsert`
+- resolve: `uk_aq_public.uk_aq_rpc_observs_outbox_resolve`
 - upsert behavior is timeout-safe: retries transient errors, and on statement timeout recursively splits payload batches before failing.
 - duplicate rows across claimed outbox entries are de-duplicated in-memory by `(connector_id, timeseries_id, observed_at)` before history upsert.
 
@@ -72,7 +72,7 @@ If `REPAIR_ONE_MISMATCH_BUCKET=true`, dry-run also runs a repair pilot for one m
 Important:
 
 - The prune function does its own outbox flush logic in-process.
-- It does not call the separate `uk-aq-history-outbox-flush-service` endpoint.
+- It does not call the separate `uk-aq-observs-outbox-flush-service` endpoint.
 
 ## Live delete behavior
 
@@ -135,9 +135,9 @@ Each bucket is deleted in bounded batches until:
 Required:
 
 - `SUPABASE_URL`
-- `HISTORY_SUPABASE_URL`
+- `OBS_AQIDB_SUPABASE_URL`
 - `SB_SECRET_KEY`
-- `HISTORY_SECRET_KEY`
+- `OBS_AQIDB_SECRET_KEY`
 
 Key optional controls:
 
@@ -173,7 +173,7 @@ Phase B required env/secrets:
 ## Related SQL scripts
 
 - `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/ingest_db/ingest_db_ops_rpcs.sql`
-- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/history_db/history_db_ops_rpcs.sql`
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/observs_db/observs_db_ops_rpcs.sql`
 - Fingerprint RPCs depend on `pgcrypto.digest`; keep `pgcrypto` installed and accessible via function `search_path` (for example `extensions` and/or `public`).
 
 For deployment and scheduler wiring, use:

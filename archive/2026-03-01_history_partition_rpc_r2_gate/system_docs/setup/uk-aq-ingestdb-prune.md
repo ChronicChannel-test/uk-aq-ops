@@ -142,7 +142,7 @@ Key optional controls:
 ## Related SQL scripts
 
 - `sql/ingest_db_ops_rpcs.sql`
-- `sql/history_db_ops_rpcs.sql`
+- `sql/observs_db_ops_rpcs.sql`
 
 For deployment and scheduler wiring, use:
 

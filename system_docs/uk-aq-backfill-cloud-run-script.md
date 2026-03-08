@@ -6,13 +6,13 @@ Quick invocation guide for the ops helper script:
 
 Full setup/runbook remains here:
 
-- `system_docs/setup/uk-aq-backfill-cloud-run.md`
+- `system_docs/uk-aq-backfill-cloud-run.md`
 
 ## Required env vars
 
 - `UK_AQ_BACKFILL_SERVICE_URL`
 - `UK_AQ_BACKFILL_TRIGGER_MODE` (`manual|scheduler`)
-- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aggdaily|history_to_r2|source_to_all`)
+- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aggdaily|obs_aqi_to_r2|source_to_all`)
 - `UK_AQ_BACKFILL_DRY_RUN` (`true|false`)
 - `UK_AQ_BACKFILL_FORCE_REPLACE` (`true|false`)
 - `UK_AQ_BACKFILL_FROM_DAY_UTC` (`YYYY-MM-DD`)

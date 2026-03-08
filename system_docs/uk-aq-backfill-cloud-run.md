@@ -5,7 +5,7 @@ Cloud Run backfill worker for UK AQ ops.
 Phase 1 status:
 
 - `local_to_aggdaily`: implemented
-- `history_to_r2`: wired stub (no export pipeline yet)
+- `obs_aqi_to_r2`: wired stub (no export pipeline yet)
 - `source_to_all`: wired stub (retention classification only)
 
 ## Runtime Components
@@ -61,18 +61,18 @@ R2 fallback note in Phase 1:
 - `enable_r2_fallback=true` can route connector/day to `r2` when local sources are empty.
 - Actual R2 pull logic is not implemented yet, so Phase 1 returns `r2_fallback_not_implemented_in_phase1` for those cases.
 
-### `history_to_r2` (stub in Phase 1)
+### `obs_aqi_to_r2` (stub in Phase 1)
 
 - Fully routed and triggerable.
 - Returns a stubbed summary only.
-- No history->R2 parquet/manifest writes yet.
+- No obs_aqidb->R2 History parquet/manifest writes yet.
 
 ### `source_to_all` (stub in Phase 1)
 
 - Fully routed and triggerable.
 - Computes retention boundary classification only:
-  - `history_write_eligible_days`
-  - `history_write_skipped_days`
+  - `observs_write_eligible_days`
+  - `observs_write_skipped_days`
 - No source acquisition/write pipeline yet.
 
 ## Required Runtime Variables/Secrets (Phase 1)
@@ -80,20 +80,20 @@ R2 fallback note in Phase 1:
 Required variables:
 
 - `SUPABASE_URL`
-- `HISTORY_SUPABASE_URL`
+- `OBS_AQIDB_SUPABASE_URL`
 - `AGGDAILY_SUPABASE_URL`
 
 Required secrets:
 
 - `SB_SECRET_KEY`
-- `HISTORY_SECRET_KEY`
+- `OBS_AQIDB_SECRET_KEY`
 - `AGGDAILY_SECRET_KEY`
 
 ## Optional Runtime Controls
 
 Core controls:
 
-- `UK_AQ_BACKFILL_RUN_MODE=local_to_aggdaily|history_to_r2|source_to_all`
+- `UK_AQ_BACKFILL_RUN_MODE=local_to_aggdaily|obs_aqi_to_r2|source_to_all`
 - `UK_AQ_BACKFILL_TRIGGER_MODE=manual|scheduler`
 - `UK_AQ_BACKFILL_DRY_RUN=true|false`
 - `UK_AQ_BACKFILL_FORCE_REPLACE=true|false`
@@ -105,7 +105,7 @@ Core controls:
 Retention / window controls:
 
 - `UK_AQ_BACKFILL_INGEST_RETENTION_DAYS` (default `7`)
-- `UK_AQ_BACKFILL_HISTORY_LOCAL_RETENTION_DAYS` (default `31`)
+- `UK_AQ_BACKFILL_OBS_AQI_LOCAL_RETENTION_DAYS` (default `31`)
 - `UK_AQ_BACKFILL_LOCAL_TIMEZONE` (default `Europe/London`)
 
 RPC tuning controls:
@@ -128,7 +128,7 @@ The helper computes a rolling local-day window in `UK_AQ_BACKFILL_LOCAL_TIMEZONE
 
 - Local retention default: 31 local days ending on last complete local day.
 - Across UK DST transitions, retained UTC day count can be `31` or `32`.
-- This is why the local history retention window is documented as `31/32` UTC days.
+- This is why the local obs_aqidb retention window is documented as `31/32` UTC days.
 
 ## Optional Ledger Schema
 
@@ -255,7 +255,7 @@ curl -sS -X POST \
 curl -sS -X POST "${SERVICE_URL}/run" \
   -H "authorization: Bearer ${ID_TOKEN}" \
   -H 'content-type: application/json' \
-  -d '{"run_mode":"history_to_r2","dry_run":true}' | jq .
+  -d '{"run_mode":"obs_aqi_to_r2","dry_run":true}' | jq .
 ```
 
 ```bash
@@ -299,7 +299,7 @@ Required env vars:
 
 - `UK_AQ_BACKFILL_SERVICE_URL`
 - `UK_AQ_BACKFILL_TRIGGER_MODE` (`manual|scheduler`)
-- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aggdaily|history_to_r2|source_to_all`)
+- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aggdaily|obs_aqi_to_r2|source_to_all`)
 - `UK_AQ_BACKFILL_DRY_RUN` (`true|false`)
 - `UK_AQ_BACKFILL_FORCE_REPLACE` (`true|false`)
 - `UK_AQ_BACKFILL_FROM_DAY_UTC` (`YYYY-MM-DD`)
