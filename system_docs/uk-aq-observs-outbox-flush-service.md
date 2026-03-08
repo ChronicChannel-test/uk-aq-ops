@@ -64,6 +64,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu 1 \
   --memory 256Mi \
   --min-instances 0 \
+  --no-cpu-boost \
   --max-instances 1 \
   --set-env-vars "SUPABASE_URL=${SUPABASE_URL},OBS_AQIDB_SUPABASE_URL=${OBS_AQIDB_SUPABASE_URL},FLUSH_CLAIM_BATCH_LIMIT=20,MAX_FLUSH_BATCHES=30" \
   --set-secrets "SB_SECRET_KEY=SB_SECRET_KEY:latest,OBS_AQIDB_SECRET_KEY=OBS_AQIDB_SECRET_KEY:latest" \
