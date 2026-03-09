@@ -10,7 +10,7 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
   - hot: previous 2 UTC days + today + next 3 UTC days -> unique btree on `(connector_id, timeseries_id, observed_at)` + BRIN(observed_at)
   - cold: BRIN(observed_at) only
 - default partition diagnostics (`count`, min/max observed_at, top offenders)
-- retention drops based on DST-aware cutoff from Europe/London local days (`31 complete local days + today`)
+- retention drops based on DST-aware cutoff from Europe/London local days (configured retention window)
 - R2 History manifest gate before each drop:
   - HEAD `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json` in Cloudflare R2
   - if not confirmed, skip drop and log `SKIP DROP — history manifest not confirmed`
@@ -25,7 +25,7 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
 Partition policy controls:
 - `OBSERVS_PARTITIONS_FUTURE_DAYS` (policy-fixed to `3`)
 - `OBSERVS_PARTITIONS_HOT_DAYS` (default `3`)
-- `OBSERVS_COMPLETE_LOCAL_DAYS` (default `31`)
+- `OBS_AQIDB_OBSERVS_RETENTION_DAYS` (default `14`)
 - `OBSERVS_DEFAULT_TOP_N` (default `20`)
 - `OBSERVS_PARTITION_DROP_DRY_RUN` (default `false`)
 
