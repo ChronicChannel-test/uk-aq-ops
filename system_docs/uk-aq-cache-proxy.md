@@ -35,17 +35,21 @@ Variables:
 
 - `SUPABASE_URL`
 - `UK_AQ_CACHE_ALLOWED_ORIGINS`
+- `UK_AQ_CACHE_WORKER_NAME` (recommended; e.g. `uk-aq-cache-test` / `uk-aq-cache-live`)
 - `UK_AQ_EDGE_SESSION_MAX_AGE_SECONDS` (optional)
 
 Secrets:
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
+- `UK_AQ_CACHE_CLOUDFLARE_API_TOKEN`
 - `SB_PUBLISHABLE_DEFAULT_KEY`
 - `UK_AQ_EDGE_ACCESS_TOKEN_SECRET`
 - `UK_AQ_EDGE_UPSTREAM_SECRET`
 - `UK_AQ_CACHE_BYPASS_SECRET`
 - `UK_AQ_TURNSTILE_SECRET_KEY`
+
+Cloudflare account variable:
+
+- `UK_AQ_CACHE_CLOUDFLARE_ACCOUNT_ID`
 
 ## Deployment
 
@@ -54,6 +58,12 @@ Workflow `uk_aq_cache_proxy_deploy.yml`:
 1. Deploys worker code.
 2. Applies worker secrets/vars with `wrangler secret bulk`.
 3. Deploys worker code again so latest config is active.
+4. Fails fast if cache-specific Cloudflare credentials are missing.
+
+Worker naming:
+
+- Workflow deploy target defaults to `uk-aq-cache-proxy`.
+- If `UK_AQ_CACHE_WORKER_NAME` is set, workflow deploys and writes secrets to that exact worker name.
 
 ## Notes
 
