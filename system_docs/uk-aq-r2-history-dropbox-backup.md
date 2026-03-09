@@ -57,6 +57,27 @@ Supports manual dispatch with:
 - `dry_run`
 - `max_days_per_run`
 
+### Recommended manual-dispatch values
+
+Use this rollout sequence:
+
+1. First validation run:
+   - `dry_run=true`
+   - `max_days_per_run=3`
+2. First write run:
+   - `dry_run=false`
+   - `max_days_per_run=1`
+3. Controlled catch-up runs:
+   - `dry_run=false`
+   - `max_days_per_run=7` (or `14` if runtime is comfortably below timeout)
+4. Steady-state daily runs:
+   - `dry_run=false`
+   - `max_days_per_run=0` (unlimited) once backlog is cleared.
+
+Notes:
+- `max_days_per_run` is per domain (`observations`, `aqilevels`).
+- `0` means unlimited and can be slower on first catch-up if many days are pending.
+
 ## Required GitHub values
 
 Secrets:
