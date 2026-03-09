@@ -12,7 +12,7 @@ This document describes the Phase 7 daily incremental backup from Cloudflare R2 
 
 Dropbox root (example):
 
-- `/CIC-Test/R2_history_backup`
+- `CIC-Test/R2_history_backup`
 
 Mirrored domain paths:
 
@@ -25,7 +25,7 @@ Checkpoint path (default):
 
 Final checkpoint object location example:
 
-- `/CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v1.json`
+- `CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v1.json`
 
 ## Script
 
@@ -95,7 +95,7 @@ Variables:
 - `CFLARE_R2_REGION` (default `auto`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
-- `UK_AQ_DROPBOX_ROOT` (default `/CIC-Test`)
+- `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
 - `UK_AQ_R2_HISTORY_DROPBOX_DIR` (default `R2_history_backup`)
 - `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (default `_ops/checkpoints/r2_history_backup_state_v1.json`)
 - `UK_AQ_R2_HISTORY_BACKUP_MAX_DAYS_PER_RUN` (default `0` = unlimited)
@@ -104,12 +104,17 @@ Effective backup root:
 
 - `{UK_AQ_DROPBOX_ROOT}/{UK_AQ_R2_HISTORY_DROPBOX_DIR}`
 
+Dropbox app-folder note:
+
+- For sandbox/app-folder tokens, keep `UK_AQ_DROPBOX_ROOT` without a leading slash.
+- Example: `CIC-Test` (not `/CIC-Test`).
+
 ## Local run
 
 ```bash
 node scripts/backup_r2/sync_history_to_dropbox.mjs \
   --source-root "uk_aq_r2:${CFLARE_R2_BUCKET}" \
-  --dest-root "uk_aq_dropbox:/CIC-Test/R2_history_backup" \
+  --dest-root "uk_aq_dropbox:CIC-Test/R2_history_backup" \
   --report-out ./tmp/r2_history_dropbox_backup_report.json
 ```
 
@@ -118,6 +123,6 @@ Dry-run:
 ```bash
 node scripts/backup_r2/sync_history_to_dropbox.mjs \
   --source-root "uk_aq_r2:${CFLARE_R2_BUCKET}" \
-  --dest-root "uk_aq_dropbox:/CIC-Test/R2_history_backup" \
+  --dest-root "uk_aq_dropbox:CIC-Test/R2_history_backup" \
   --dry-run
 ```
