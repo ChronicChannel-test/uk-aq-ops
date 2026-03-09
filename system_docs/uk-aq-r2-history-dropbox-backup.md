@@ -48,6 +48,10 @@ GitHub workflow:
 
 - `.github/workflows/uk_aq_r2_history_dropbox_backup.yml`
 
+Restore workflow (manual):
+
+- `.github/workflows/uk_aq_r2_history_restore_from_dropbox.yml`
+
 Default schedule:
 
 - `35 4 * * *` (UTC)
@@ -56,6 +60,44 @@ Supports manual dispatch with:
 
 - `dry_run`
 - `max_days_per_run`
+
+### How dispatch inputs behave
+
+- `Run without writing copy/checkpoint changes` (`dry_run=true`):
+  - Performs listing + manifest checks + copy planning only.
+  - Does not write copied files.
+  - Does not update checkpoint state.
+- `Override max new days copied per domain (0 = unlimited)` (`max_days_per_run`):
+  - This is a per-domain copy cap, not a "days from now" lookback.
+  - `1` means: copy at most one uncopied complete day for `observations`, and at most one uncopied complete day for `aqilevels`, in that run.
+  - `0` means no cap (all uncopied complete days can be copied).
+
+Selection rule used by the script for each domain:
+
+1. List available `day_utc=YYYY-MM-DD` folders under the R2 History domain prefix.
+2. Sort days ascending (oldest to newest).
+3. Remove days already recorded in backup checkpoint state.
+4. Apply `max_days_per_run` cap.
+5. Copy only days with a source `manifest.json` (incomplete days are skipped).
+
+Practical effect:
+
+- Running with `max_days_per_run=1` repeatedly will only copy a day when a new uncopied complete day exists.
+- If yesterday was already copied (or not yet complete), the next run can show `copied_days=0`.
+
+### Interpreting a "no new copy" run
+
+If a run succeeds but copies nothing, read these fields in the JSON report:
+
+- `listed_days`: complete day folders currently visible in source prefix.
+- `candidate_days`: listed days minus already-checkpointed days, after cap.
+- `copied_days`: days actually copied this run.
+- `skipped_existing`: days intentionally skipped because already checkpointed.
+
+Example:
+
+- `listed_days=1`, `candidate_days=0`, `copied_days=0`, `skipped_existing=1`
+  means the only available complete day is already backed up, so this is expected.
 
 ### Recommended manual-dispatch values
 
@@ -126,3 +168,29 @@ node scripts/backup_r2/sync_history_to_dropbox.mjs \
   --dest-root "uk_aq_dropbox:CIC-Test/R2_history_backup" \
   --dry-run
 ```
+
+## Restore (Dropbox -> R2 History)
+
+Script:
+
+- `scripts/backup_r2/restore_history_from_dropbox.mjs`
+
+Workflow dispatch inputs:
+
+- `dry_run`:
+  - `true` = validate/list/copy-plan only.
+  - `false` = write to R2.
+- `day_utc`:
+  - Optional `YYYY-MM-DD`.
+  - If set, restore only that day folder under selected domains.
+  - If blank, restore selected full domain prefixes.
+- `restore_observations`:
+  - Include `history/v1/observations`.
+- `restore_aqilevels`:
+  - Include `history/v1/aqilevels`.
+
+Recommended first restore run:
+
+1. `dry_run=true`
+2. Set the required domain flags.
+3. Set `day_utc` if you want a targeted restore first.
