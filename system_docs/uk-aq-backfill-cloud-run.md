@@ -171,6 +171,7 @@ RPC tuning:
 - `UK_AQ_BACKFILL_SOURCE_RPC_PAGE_SIZE` (default `1000`)
 - `UK_AQ_BACKFILL_SOURCE_RPC_MAX_PAGES` (default `200`)
 - `UK_AQ_BACKFILL_OBS_R2_PAGE_SIZE` (default `20000`)
+- `UK_AQ_BACKFILL_OBS_R2_MAX_PAGES` (default `50000`; safety ceiling for obs/aqi history export pagination)
 - `UK_AQ_R2_HISTORY_PART_MAX_ROWS` (default `1000000`)
 - `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE` (default `100000`)
 - `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` (default `uk_aq_rpc_observs_history_day_rows`)
@@ -183,6 +184,7 @@ Fallback note:
 
 - if `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` is unavailable, expose `uk_aq_observs` in PostgREST so table fallback can read `uk_aq_observs.observations`.
 - AQI history export requires both AQI RPCs above (no table fallback path).
+- `obs_aqi_to_r2` pagination is cursor-driven and runs until an empty page is returned; it does not stop early solely because a page is smaller than the requested page size.
 
 Ledger:
 
