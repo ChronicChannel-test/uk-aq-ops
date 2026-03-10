@@ -64,20 +64,26 @@ R2 fallback note:
 
 Implemented as a real export/write path.
 
-- Checks committed day manifests directly in R2:
+- Checks committed day manifests directly in R2 for both domains:
   - `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
+  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
 - Reads source rows from `obs_aqidb` (`uk_aq_observs.observations`) via:
   - `uk_aq_public.uk_aq_rpc_observs_history_day_rows` when available, else
   - direct table fallback query.
-- Writes:
+- Reads AQI rows from `obs_aqidb` (`uk_aq_aqilevels.station_aqi_hourly`) via:
+  - `uk_aq_public.uk_aq_rpc_aqilevels_history_day_connector_counts`
+  - `uk_aq_public.uk_aq_rpc_aqilevels_history_day_rows`
+- Writes in both domains:
   - connector parquet parts (`part-00000.parquet`, etc.),
   - connector manifests,
-  - day manifest under `history/v1/observations/day_utc=.../manifest.json`.
+  - day manifest under:
+    - `history/v1/observations/day_utc=.../manifest.json`
+    - `history/v1/aqilevels/day_utc=.../manifest.json`
 - Honors `force_replace=true` by re-exporting selected connector/day payloads.
 
 Outcomes:
 
-- `dry_run=true`: returns planning summary with `backed_up_days` and `pending_backfill_days`.
+- `dry_run=true`: returns planning summary with `backed_up_days` and `pending_backfill_days` where "backed up" means both observations + aqilevels day manifests exist.
 - `dry_run=false`: executes writes for pending (or forced) days.
 - non-dry returns `error` if connector/day failures leave pending days after run.
 
@@ -168,10 +174,15 @@ RPC tuning:
 - `UK_AQ_R2_HISTORY_PART_MAX_ROWS` (default `1000000`)
 - `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE` (default `100000`)
 - `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` (default `uk_aq_rpc_observs_history_day_rows`)
+- `UK_AQ_BACKFILL_AQI_R2_SOURCE_RPC` (default `uk_aq_rpc_aqilevels_history_day_rows`)
+- `UK_AQ_BACKFILL_AQI_R2_CONNECTOR_COUNTS_RPC` (default `uk_aq_rpc_aqilevels_history_day_connector_counts`)
+- `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
 
 Fallback note:
 
 - if `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` is unavailable, expose `uk_aq_observs` in PostgREST so table fallback can read `uk_aq_observs.observations`.
+- AQI history export requires both AQI RPCs above (no table fallback path).
 
 Ledger:
 
