@@ -74,7 +74,7 @@ Target service endpoint:
 ## SQL prerequisites
 
 Apply in obs_aqidb:
-- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/observs_db/observs_db_ops_rpcs.sql`
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/obs_aqi_db/uk_aq_obs_aqi_db_ops_rpcs.sql`
 
 The service expects these RPCs to exist:
 - `uk_aq_public.uk_aq_rpc_observs_ensure_daily_partitions`
