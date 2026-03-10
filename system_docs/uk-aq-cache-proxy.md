@@ -70,3 +70,4 @@ Worker naming:
 - Route binding is managed in Cloudflare (dashboard or Wrangler route config).
 - Keep test/prod hostnames and origin allowlists separated by environment.
 - Upstream edge functions must validate `X-UK-AQ-Upstream-Auth` with the same `UK_AQ_EDGE_UPSTREAM_SECRET`.
+- Same-origin browser requests are accepted even when `Origin` is omitted (fallback uses `Sec-Fetch-Site: same-origin` or same-origin `Referer`).
