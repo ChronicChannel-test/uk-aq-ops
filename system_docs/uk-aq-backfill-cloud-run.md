@@ -80,6 +80,9 @@ Implemented as a real export/write path.
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
 - Honors `force_replace=true` by re-exporting selected connector/day payloads.
+- Safety guards for partial-day prevention:
+  - when `connector_ids` filter is used, export is blocked if non-target connectors for that day do not already have connector manifests;
+  - if a day export fails and that day was not previously committed (no existing day manifest), the worker deletes that day prefix so partial connector artifacts are not left in R2.
 
 Outcomes:
 

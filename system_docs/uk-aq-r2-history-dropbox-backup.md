@@ -35,7 +35,7 @@ Script:
 
 The script:
 
-1. Lists day folders for `observations` and `aqilevels` from R2 prefixes.
+1. Lists committed day manifests for `observations` and `aqilevels` from R2 prefixes.
 2. Uses checkpoint state plus source day-manifest hash to identify days that are new or changed since last copy.
 3. Verifies source day completeness via day manifest existence (`manifest.json`).
 4. Uses `rclone copy` for day-folder copy operations.
@@ -74,7 +74,7 @@ Supports manual dispatch with:
 
 Selection rule used by the script for each domain:
 
-1. List available `day_utc=YYYY-MM-DD` folders under the R2 History domain prefix.
+1. List available `day_utc=YYYY-MM-DD/manifest.json` files under the R2 History domain prefix.
 2. Sort days ascending (oldest to newest).
 3. For days already checkpointed with a stored `manifest_hash`, compare the current source `manifest.json` hash:
    - If hash matches, skip as existing.
@@ -92,7 +92,7 @@ Practical effect:
 
 If a run succeeds but copies nothing, read these fields in the JSON report:
 
-- `listed_days`: complete day folders currently visible in source prefix.
+- `listed_days`: committed day manifests currently visible in source prefix.
 - `candidate_days`: days queued for copy after checkpoint + manifest-hash comparison, after cap.
 - `copied_days`: days actually copied this run.
 - `skipped_existing`: days skipped because checkpoint hash still matches source (plus any days deferred by `max_days_per_run`).
