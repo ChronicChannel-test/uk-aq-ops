@@ -65,7 +65,7 @@ R2 fallback note:
 Implemented as a plan/check mode for now.
 
 - Reads committed backup bounds using `uk_aq_public.uk_aq_rpc_r2_history_window`.
-- Reads day completion evidence from `uk_aq_ops.prune_day_gates` in ingest DB.
+- Reads committed day list using `uk_aq_public.uk_aq_rpc_r2_history_backed_up_days(date, date)`.
 - Treats a day as complete only when all are true:
   - `history_done = true`
   - `history_manifest_key is not null`
