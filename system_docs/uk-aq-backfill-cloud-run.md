@@ -6,7 +6,7 @@ Current status (Phase 9, incremental):
 
 - `local_to_aqilevels`: implemented and production runnable.
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
-- `source_to_all`: partial execution implemented (local retained days only).
+- `source_to_r2`: partial execution implemented (local retained days only).
 
 ## Runtime Components
 
@@ -90,7 +90,7 @@ Outcomes:
 - `dry_run=false`: executes writes for pending (or forced) days.
 - non-dry returns `error` if connector/day failures leave pending days after run.
 
-### `source_to_all`
+### `source_to_r2`
 
 Partially implemented:
 
@@ -117,7 +117,7 @@ Status behavior:
 
 ## Required Runtime Variables and Secrets
 
-### Required for `local_to_aqilevels` and `source_to_all` local writes
+### Required for `local_to_aqilevels` and `source_to_r2` local writes
 
 Variables:
 
@@ -150,7 +150,7 @@ Secrets:
 
 Core:
 
-- `UK_AQ_BACKFILL_RUN_MODE=local_to_aqilevels|obs_aqi_to_r2|source_to_all`
+- `UK_AQ_BACKFILL_RUN_MODE=local_to_aqilevels|obs_aqi_to_r2|source_to_r2`
 - `UK_AQ_BACKFILL_TRIGGER_MODE=manual|scheduler`
 - `UK_AQ_BACKFILL_DRY_RUN=true|false`
 - `UK_AQ_BACKFILL_FORCE_REPLACE=true|false`
@@ -254,14 +254,14 @@ curl -sS -X POST http://127.0.0.1:8000/run \
   }' | jq .
 ```
 
-### 5) Local dry-run (`source_to_all` split planning)
+### 5) Local dry-run (`source_to_r2` split planning)
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/run \
   -H 'content-type: application/json' \
   -d '{
     "trigger_mode": "manual",
-    "run_mode": "source_to_all",
+    "run_mode": "source_to_r2",
     "dry_run": true,
     "from_day_utc": "2026-01-01",
     "to_day_utc": "2026-02-10"
@@ -283,7 +283,7 @@ SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" \
 ID_TOKEN="$(gcloud auth print-identity-token)"
 ```
 
-### 7) Cloud Run non-dry `source_to_all` (partial mode visible)
+### 7) Cloud Run non-dry `source_to_r2` (partial mode visible)
 
 ```bash
 curl -sS -X POST "${SERVICE_URL}/run" \
@@ -291,7 +291,7 @@ curl -sS -X POST "${SERVICE_URL}/run" \
   -H 'content-type: application/json' \
   -d '{
     "trigger_mode": "manual",
-    "run_mode": "source_to_all",
+    "run_mode": "source_to_r2",
     "dry_run": false,
     "from_day_utc": "2026-01-01",
     "to_day_utc": "2026-02-10"

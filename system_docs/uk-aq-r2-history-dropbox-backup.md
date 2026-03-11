@@ -18,6 +18,7 @@ Mirrored domain paths:
 
 - `history/v1/observations/day_utc=YYYY-MM-DD/...`
 - `history/v1/aqilevels/day_utc=YYYY-MM-DD/...`
+- `history/v1/core/day_utc=YYYY-MM-DD/...`
 
 Checkpoint path (default):
 
@@ -35,7 +36,7 @@ Script:
 
 The script:
 
-1. Lists committed day manifests for `observations` and `aqilevels` from R2 prefixes.
+1. Lists committed day manifests for `observations`, `aqilevels`, and `core` from R2 prefixes.
 2. Uses checkpoint state plus source day-manifest hash to identify days that are new or changed since last copy.
 3. Verifies source day completeness via day manifest existence (`manifest.json`).
 4. Uses `rclone copy` for day-folder copy operations.
@@ -56,6 +57,16 @@ Default schedule:
 
 - `35 4 * * *` (UTC)
 
+Core snapshot workflow (R2 write):
+
+- `.github/workflows/uk_aq_r2_core_snapshot.yml`
+- default schedule: `15 4 * * *` (UTC)
+- script: `scripts/backup_r2/uk_aq_core_snapshot_to_r2.mjs`
+- output per day:
+  - `history/v1/core/day_utc=YYYY-MM-DD/manifest.json`
+  - `history/v1/core/day_utc=YYYY-MM-DD/checksums.sha256`
+  - `history/v1/core/day_utc=YYYY-MM-DD/table=<table>/rows.ndjson.gz`
+
 Supports manual dispatch with:
 
 - `dry_run`
@@ -69,7 +80,7 @@ Supports manual dispatch with:
   - Does not update checkpoint state.
 - `Override max new days copied per domain (0 = unlimited)` (`max_days_per_run`):
   - This is a per-domain copy cap, not a "days from now" lookback.
-  - `1` means: copy at most one uncopied complete day for `observations`, and at most one uncopied complete day for `aqilevels`, in that run.
+  - `1` means: copy at most one uncopied complete day for each selected domain (`observations`, `aqilevels`, `core`) in that run.
   - `0` means no cap (all uncopied complete days can be copied).
 
 Selection rule used by the script for each domain:
@@ -120,7 +131,7 @@ Use this rollout sequence:
    - `max_days_per_run=0` (unlimited) once backlog is cleared.
 
 Notes:
-- `max_days_per_run` is per domain (`observations`, `aqilevels`).
+- `max_days_per_run` is per domain (`observations`, `aqilevels`, `core`).
 - `0` means unlimited and can be slower on first catch-up if many days are pending.
 
 ## Required GitHub values
@@ -140,6 +151,7 @@ Variables:
 - `CFLARE_R2_REGION` (default `auto`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
+- `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
 - `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
 - `UK_AQ_R2_HISTORY_DROPBOX_DIR` (default `R2_history_backup`)
 - `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (default `_ops/checkpoints/r2_history_backup_state_v1.json`)
@@ -172,6 +184,49 @@ node scripts/backup_r2/sync_history_to_dropbox.mjs \
   --dry-run
 ```
 
+## Outside-retention row-count compare
+
+Script:
+
+- `scripts/backup_r2/uk_aq_history_counts_compare.mjs`
+
+Purpose:
+
+- Compare per-day/per-connector row counts for `observs` and `aqilevels` outside retention windows.
+- Sources:
+  - ingestdb (`observs`)
+  - obs_aqidb (`observs` + `aqilevels`)
+  - live R2 history manifests
+  - local Dropbox backup manifests
+
+Retention cutoffs used (from env):
+
+- `OBS_AQIDB_OBSERVS_RETENTION_DAYS`
+- `OBS_AQIDB_AQILEVELS_RETENTION_DAYS`
+
+Run (JSON):
+
+```bash
+node scripts/backup_r2/uk_aq_history_counts_compare.mjs --format json
+```
+
+Run all complete days (not just outside retention):
+
+```bash
+node scripts/backup_r2/uk_aq_history_counts_compare.mjs \
+  --format json \
+  --scope all-complete
+```
+
+Run (CSV, mismatches only):
+
+```bash
+node scripts/backup_r2/uk_aq_history_counts_compare.mjs \
+  --format csv \
+  --only-mismatch \
+  --out ./logs/history-counts-mismatch.csv
+```
+
 ## Restore (Dropbox -> R2 History)
 
 Script:
@@ -191,6 +246,8 @@ Workflow dispatch inputs:
   - Include `history/v1/observations`.
 - `restore_aqilevels`:
   - Include `history/v1/aqilevels`.
+- `restore_core`:
+  - Include `history/v1/core`.
 
 Recommended first restore run:
 
