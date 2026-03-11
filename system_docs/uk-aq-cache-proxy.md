@@ -28,12 +28,14 @@ Read endpoints:
 - `/api/aq/stations` -> `uk_aq_stations`
 - `/api/aq/la-hex` -> `uk_aq_la_hex`
 - `/api/aq/pcon-hex` -> `uk_aq_pcon_hex`
+- `/api/aq/aqi-history` -> external AQI history R2 API URL (`UK_AQ_AQI_HISTORY_R2_API_URL`)
 
 ## Required GitHub env/secret targets
 
 Variables:
 
 - `SUPABASE_URL`
+- `UK_AQ_AQI_HISTORY_R2_API_URL`
 - `UK_AQ_CACHE_ALLOWED_ORIGINS`
 - `UK_AQ_CACHE_WORKER_NAME` (recommended; e.g. `uk-aq-cache-test` / `uk-aq-cache-live`)
 - `UK_AQ_EDGE_SESSION_MAX_AGE_SECONDS` (optional)
