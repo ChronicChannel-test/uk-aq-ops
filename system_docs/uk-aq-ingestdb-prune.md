@@ -20,12 +20,14 @@ Bucket key is:
 
 0. Phase B pre-prune history gate:
 - Before fingerprint compare/delete work, the service runs Phase B R2 History export for closed UTC days (`day_utc <= utc_today - 8 days`).
-- Source rows are streamed through server-side projection function `uk_aq_ops.uk_aq_phase_b_history_rows` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
-- Part rollover defaults to `1,000,000` rows per file.
-- Phase B writes each part directly to committed prefix (`history/v1/observations/...`) and persists resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
+- Observations source rows are streamed through server-side projection function `uk_aq_ops.uk_aq_phase_b_history_rows` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
+- Observations part rollover defaults to `1,000,000` rows per file.
+- Observations write each part directly to committed prefix (`history/v1/observations/...`) and persist resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
+- AQI levels are exported in the same run for completed observation days that are missing AQI day manifests; AQI rows are streamed from `uk_aq_aqilevels.station_aqi_hourly` grouped by connector and written to `history/v1/aqilevels/...`.
 - Phase B writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.history_candidates`
   - `uk_aq_ops.prune_day_gates.history_done`
+- `uk_aq_ops.prune_day_gates.history_done` continues to gate prune deletes using observation backup completion.
 - Legacy staging objects are still cleaned up by retention policy (`history/v1/_ops/observations/staging/...`) to drain old runs.
 - Prune deletion for an hour bucket is allowed only when that bucket day has `history_done=true`.
 
@@ -158,6 +160,7 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_STAGING_RETENTION_DAYS` (default `7`)
 - `UK_AQ_R2_HISTORY_STAGING_PREFIX` (default `history/v1/_ops/observations/staging`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
 
