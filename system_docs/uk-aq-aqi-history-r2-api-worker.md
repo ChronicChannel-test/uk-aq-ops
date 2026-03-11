@@ -6,7 +6,12 @@ Deploy workflow: `.github/workflows/uk_aq_aqi_history_r2_api_worker_deploy.yml`
 
 ## Purpose
 
-Cloudflare Worker for station AQI history reads from R2 backups (`history/v1/aqilevels`), intended for website DAQI/EAQI charts.
+Cloudflare Worker for station AQI history reads, stitched from:
+
+- recent window from `obs_aqidb` (`uk_aq_public.uk_aq_station_aqi_hourly`), and
+- older window from R2 backups (`history/v1/aqilevels`).
+
+This is intended for website DAQI/EAQI charts where recent AQI is not yet exported to R2.
 
 ## Routes
 
@@ -33,6 +38,14 @@ Optional:
 - `row_limit` (`1..20000`)
   - alias: `limit`
 
+Window split behavior:
+
+- default recent source-of-truth window is last `168` hours (7 days) from now.
+- requests are split into:
+  - older segment -> R2 history, and
+  - recent segment -> ObsAQIDB live table/view.
+- overlapping timestamps are de-duplicated by hour, with ObsAQIDB rows winning.
+
 ## Auth
 
 - Requires header `x-uk-aq-upstream-auth`.
@@ -55,11 +68,18 @@ Secrets:
 
 - `UK_AQ_AQI_HISTORY_R2_API_CLOUDFLARE_API_TOKEN` (or fallback `CLOUDFLARE_API_TOKEN`)
 - `UK_AQ_EDGE_UPSTREAM_SECRET`
+- `OBS_AQIDB_SECRET_KEY`
+
+Variables:
+
+- `OBS_AQIDB_SUPABASE_URL`
 
 ## Runtime vars (wrangler defaults)
 
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX=history/v1/aqilevels`
 - `UK_AQ_AQI_HISTORY_R2_CACHE_MAX_AGE_SECONDS=300`
+- `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS=168` (default)
+- `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
 
 ## Cache proxy integration
 
