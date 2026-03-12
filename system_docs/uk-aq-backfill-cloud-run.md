@@ -128,6 +128,10 @@ Shared behavior:
 - Supports optional local archive mirroring for replay/dev:
   - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT`.
   - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` (local runs only).
+- Station-targeted scope:
+  - accept `station_id` / `station_ids`,
+  - resolve `connector_id` + `station_ref` from ingest `uk_aq_core.stations`,
+  - apply that scope across Sensor.Community and OpenAQ source backfill paths.
 
 Status behavior:
 
@@ -185,6 +189,7 @@ Core:
 - `UK_AQ_BACKFILL_FROM_DAY_UTC=YYYY-MM-DD`
 - `UK_AQ_BACKFILL_TO_DAY_UTC=YYYY-MM-DD`
 - `UK_AQ_BACKFILL_CONNECTOR_IDS=4,7,11`
+- `UK_AQ_BACKFILL_STATION_IDS=24665,24666` (or `UK_AQ_BACKFILL_STATION_ID=24665`)
 - `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK=true|false`
 - `UK_AQ_BACKFILL_ALLOW_STUB_MODES=true|false` (default `false`)
 
@@ -326,6 +331,21 @@ curl -sS -X POST http://127.0.0.1:8000/run \
 
 Use the Sensor.Community connector id (commonly `7`) or the OpenAQ connector id for OpenAQ AWS archive backfill.
 
+### 5a) Local station-targeted dry-run (`source_to_r2`)
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/run \
+  -H 'content-type: application/json' \
+  -d '{
+    "trigger_mode": "manual",
+    "run_mode": "source_to_r2",
+    "dry_run": true,
+    "from_day_utc": "2026-02-11",
+    "to_day_utc": "2026-02-15",
+    "station_id": 24665
+  }' | jq .
+```
+
 ### 6) Cloud Run call setup
 
 ```bash
@@ -354,7 +374,7 @@ curl -sS -X POST "${SERVICE_URL}/run" \
     "force_replace": true,
     "from_day_utc": "2026-02-11",
     "to_day_utc": "2026-02-15",
-    "connector_ids": [7]
+    "station_ids": [24665]
   }' | jq .
 ```
 
