@@ -13,6 +13,9 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
 - retention drops based on DST-aware cutoff from Europe/London local days (configured retention window)
 - R2 History manifest gate before each drop:
   - HEAD `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json` in Cloudflare R2
+  - GET the same `manifest.json` and validate:
+    - `day_utc` matches the partition day
+    - `manifest_hash` matches SHA-256 of manifest content excluding `manifest_hash`
   - if not confirmed, skip drop and log `SKIP DROP — history manifest not confirmed`
 
 ## Required environment variables
@@ -82,3 +85,9 @@ The service expects these RPCs to exist:
 - `uk_aq_public.uk_aq_rpc_observs_observations_default_diagnostics`
 - `uk_aq_public.uk_aq_rpc_observs_drop_candidates`
 - `uk_aq_public.uk_aq_rpc_observs_drop_partition`
+
+Partition DDL RPCs should run with explicit SQL timeouts:
+- `uk_aq_rpc_observs_ensure_daily_partitions`
+- `uk_aq_rpc_observs_enforce_hot_cold_indexes`
+- `statement_timeout = '15min'`
+- `lock_timeout = '5s'`
