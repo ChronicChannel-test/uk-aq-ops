@@ -6,7 +6,7 @@ Current status (Phase 9, incremental):
 
 - `local_to_aqilevels`: implemented and production runnable.
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
-- `source_to_r2`: Sensor.Community source adapter implemented for archive-to-R2 writes.
+- `source_to_r2`: Sensor.Community + OpenAQ source adapters implemented for archive-to-R2 writes.
 
 ## Runtime Components
 
@@ -92,15 +92,27 @@ Outcomes:
 
 ### `source_to_r2`
 
-Implemented Sensor.Community path:
+Implemented source adapters:
 
-- Source acquisition from `https://archive.sensor.community/YYYY-MM-DD/`.
+- Sensor.Community
+  - source acquisition from `https://archive.sensor.community/YYYY-MM-DD/`.
+  - archive files filtered by known core `station_ref` (Sensor.Community `sensor_id`).
+  - unknown archive station refs are logged.
+- OpenAQ (phase 1)
+  - source acquisition from OpenAQ public AWS archive only:
+    - `records/csv.gz/locationid=<LOCATION_ID>/year=<YYYY>/month=<MM>/location-<LOCATION_ID>-<YYYYMMDD>.csv.gz`
+  - candidate UK location universe comes from existing OpenAQ station refs (no OpenAQ API fallback in phase 1).
+  - source mapping follows project mapping:
+    - `station_ref = OpenAQ location_id`
+    - `timeseries_ref = OpenAQ sensor_id`
+  - optional local raw mirror (local runs only) reuses/saves source `.csv.gz` files under:
+    - `day_utc=YYYY-MM-DD/location-<location_id>-<YYYYMMDD>.csv.gz`
+
+Shared behavior:
+
 - Core metadata resolution:
   - reads connector/timeseries metadata from latest R2 core snapshot first (`UK_AQ_R2_HISTORY_CORE_PREFIX`),
   - falls back to ingest `uk_aq_core` tables when needed.
-- File selection:
-  - archive files are filtered by known core `station_ref` (Sensor.Community `sensor_id`).
-  - unknown archive station refs are logged for controlled onboarding.
 - Observations export:
   - parses archive CSV rows into canonical `(timeseries_id, observed_at, value)` observations.
 - AQI export:
@@ -115,6 +127,7 @@ Implemented Sensor.Community path:
     - `history/v1/aqilevels/day_utc=.../manifest.json`
 - Supports optional local archive mirroring for replay/dev:
   - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT`.
+  - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` (local runs only).
 
 Status behavior:
 
@@ -200,6 +213,15 @@ RPC tuning:
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_FETCH_RETRIES` (default `3`; retries Sensor.Community index/CSV fetches on transient HTTP/network errors)
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_RETRY_BASE_MS` (default `1500`; linear retry backoff base delay in ms)
 - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT` (optional local replay mirror)
+- `UK_AQ_BACKFILL_OPENAQ_SOURCE_ENABLED` (default `true`)
+- `UK_AQ_BACKFILL_OPENAQ_CONNECTOR_CODE` (default `openaq`)
+- `UK_AQ_BACKFILL_OPENAQ_CONNECTOR_ID_FALLBACK` (optional numeric fallback connector id)
+- `UK_AQ_BACKFILL_OPENAQ_ARCHIVE_BASE_URL` (default `https://openaq-data-archive.s3.amazonaws.com`)
+- `UK_AQ_BACKFILL_OPENAQ_INCLUDE_MET_FIELDS` (default `true`)
+- `UK_AQ_BACKFILL_OPENAQ_ARCHIVE_TIMEOUT_MS` (default `120000`)
+- `UK_AQ_BACKFILL_OPENAQ_ARCHIVE_FETCH_RETRIES` (default `3`)
+- `UK_AQ_BACKFILL_OPENAQ_ARCHIVE_RETRY_BASE_MS` (default `1500`)
+- `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` (optional local replay mirror; only used when running `run_job.ts` locally)
 - `UK_AQ_R2_HISTORY_PART_MAX_ROWS` (default `1000000`)
 - `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE` (default `100000`)
 - `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` (default `uk_aq_rpc_observs_history_day_rows`)
@@ -287,7 +309,7 @@ curl -sS -X POST http://127.0.0.1:8000/run \
   }' | jq .
 ```
 
-### 5) Local dry-run (`source_to_r2` Sensor.Community archive plan)
+### 5) Local dry-run (`source_to_r2` archive plan)
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/run \
@@ -301,6 +323,8 @@ curl -sS -X POST http://127.0.0.1:8000/run \
     "connector_ids": [7]
   }' | jq .
 ```
+
+Use the Sensor.Community connector id (commonly `7`) or the OpenAQ connector id for OpenAQ AWS archive backfill.
 
 ### 6) Cloud Run call setup
 
