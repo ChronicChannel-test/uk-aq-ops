@@ -6,7 +6,7 @@ Current status (Phase 9, incremental):
 
 - `local_to_aqilevels`: implemented and production runnable.
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
-- `source_to_r2`: partial execution implemented (local retained days only).
+- `source_to_r2`: Sensor.Community source adapter implemented for archive-to-R2 writes.
 
 ## Runtime Components
 
@@ -92,21 +92,36 @@ Outcomes:
 
 ### `source_to_r2`
 
-Partially implemented:
+Implemented Sensor.Community path:
 
-- Computes rolling local retention window (`UK_AQ_BACKFILL_LOCAL_TIMEZONE`, `UK_AQ_BACKFILL_OBS_AQI_LOCAL_RETENTION_DAYS`).
-- Splits requested days into:
-  - `local_to_aqilevels_days` (inside local retention window),
-  - `source_acquisition_pending_days` (outside local retention window).
-- Executes `local_to_aqilevels` for retained days.
-- Returns warnings for pending source acquisition days.
+- Source acquisition from `https://archive.sensor.community/YYYY-MM-DD/`.
+- Core metadata resolution:
+  - reads connector/timeseries metadata from latest R2 core snapshot first (`UK_AQ_R2_HISTORY_CORE_PREFIX`),
+  - falls back to ingest `uk_aq_core` tables when needed.
+- File selection:
+  - archive files are filtered by known core `station_ref` (Sensor.Community `sensor_id`).
+  - unknown archive station refs are logged for controlled onboarding.
+- Observations export:
+  - parses archive CSV rows into canonical `(timeseries_id, observed_at, value)` observations.
+- AQI export:
+  - derives hourly means/sample counts from parsed observations,
+  - computes rolling 24h PM means,
+  - computes DAQI/EAQI index levels in-worker using project breakpoints,
+  - writes canonical AQI hourly rows to R2.
+- Output layout:
+  - writes connector parquet parts + connector manifests for both domains,
+  - then writes day manifests:
+    - `history/v1/observations/day_utc=.../manifest.json`
+    - `history/v1/aqilevels/day_utc=.../manifest.json`
+- Supports optional local archive mirroring for replay/dev:
+  - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT`.
 
 Status behavior:
 
 - `dry_run=true`: `dry_run`.
-- non-dry with pending acquisition days: `stubbed`.
-- non-dry with no pending days and no local errors: `ok`.
-- local processing errors: `error`.
+- non-dry with pending unsupported connector acquisition days: `stubbed`.
+- non-dry with no pending days and no connector/day errors: `ok`.
+- connector/day processing errors: `error`.
 
 ## Run Status Values
 
@@ -117,7 +132,7 @@ Status behavior:
 
 ## Required Runtime Variables and Secrets
 
-### Required for `local_to_aqilevels` and `source_to_r2` local writes
+### Required for `local_to_aqilevels` AQI DB writes
 
 Variables:
 
@@ -129,7 +144,7 @@ Secrets:
 - `SB_SECRET_KEY`
 - `OBS_AQIDB_SECRET_KEY`
 
-### Required for `obs_aqi_to_r2` export/write
+### Required for `obs_aqi_to_r2` and `source_to_r2` R2 export/write
 
 Variables:
 
@@ -175,6 +190,14 @@ RPC tuning:
 - `UK_AQ_BACKFILL_SOURCE_RPC_MAX_PAGES` (default `200`)
 - `UK_AQ_BACKFILL_OBS_R2_PAGE_SIZE` (default `20000`)
 - `UK_AQ_BACKFILL_OBS_R2_MAX_PAGES` (default `50000`; safety ceiling for obs/aqi history export pagination)
+- `UK_AQ_BACKFILL_R2_CORE_LOOKBACK_DAYS` (default `45`)
+- `UK_AQ_BACKFILL_R2_CORE_SNAPSHOT_MAX_BYTES` (default `250000000`)
+- `UK_AQ_BACKFILL_SCOMM_SOURCE_ENABLED` (default `true`)
+- `UK_AQ_BACKFILL_SCOMM_CONNECTOR_CODE` (default `sensorcommunity`)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_BASE_URL` (default `https://archive.sensor.community`)
+- `UK_AQ_BACKFILL_SCOMM_INCLUDE_MET_FIELDS` (default `true`)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_TIMEOUT_MS` (default `120000`)
+- `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT` (optional local replay mirror)
 - `UK_AQ_R2_HISTORY_PART_MAX_ROWS` (default `1000000`)
 - `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE` (default `100000`)
 - `UK_AQ_BACKFILL_OBS_R2_SOURCE_RPC` (default `uk_aq_rpc_observs_history_day_rows`)
@@ -182,6 +205,7 @@ RPC tuning:
 - `UK_AQ_BACKFILL_AQI_R2_CONNECTOR_COUNTS_RPC` (default `uk_aq_rpc_aqilevels_history_day_connector_counts`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
+- `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
 
 Fallback note:
 
@@ -254,7 +278,7 @@ curl -sS -X POST http://127.0.0.1:8000/run \
   }' | jq .
 ```
 
-### 5) Local dry-run (`source_to_r2` split planning)
+### 5) Local dry-run (`source_to_r2` Sensor.Community archive plan)
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/run \
@@ -263,8 +287,9 @@ curl -sS -X POST http://127.0.0.1:8000/run \
     "trigger_mode": "manual",
     "run_mode": "source_to_r2",
     "dry_run": true,
-    "from_day_utc": "2026-01-01",
-    "to_day_utc": "2026-02-10"
+    "from_day_utc": "2026-02-11",
+    "to_day_utc": "2026-02-15",
+    "connector_ids": [7]
   }' | jq .
 ```
 
@@ -283,7 +308,7 @@ SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" \
 ID_TOKEN="$(gcloud auth print-identity-token)"
 ```
 
-### 7) Cloud Run non-dry `source_to_r2` (partial mode visible)
+### 7) Cloud Run non-dry `source_to_r2`
 
 ```bash
 curl -sS -X POST "${SERVICE_URL}/run" \
@@ -293,8 +318,10 @@ curl -sS -X POST "${SERVICE_URL}/run" \
     "trigger_mode": "manual",
     "run_mode": "source_to_r2",
     "dry_run": false,
-    "from_day_utc": "2026-01-01",
-    "to_day_utc": "2026-02-10"
+    "force_replace": true,
+    "from_day_utc": "2026-02-11",
+    "to_day_utc": "2026-02-15",
+    "connector_ids": [7]
   }' | jq .
 ```
 
