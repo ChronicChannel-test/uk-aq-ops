@@ -16,6 +16,9 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
   - GET the same `manifest.json` and validate:
     - `day_utc` matches the partition day
     - `manifest_hash` matches SHA-256 of manifest content excluding `manifest_hash`
+  - if manifest is missing, check `uk_aq_observs` day presence via RPC:
+    - if the day has rows: skip drop
+    - if the day has no rows: drop the empty partition
   - if not confirmed, skip drop and log `SKIP DROP — history manifest not confirmed`
 
 ## Required environment variables
@@ -85,6 +88,7 @@ The service expects these RPCs to exist:
 - `uk_aq_public.uk_aq_rpc_observs_observations_default_diagnostics`
 - `uk_aq_public.uk_aq_rpc_observs_drop_candidates`
 - `uk_aq_public.uk_aq_rpc_observs_drop_partition`
+- `uk_aq_public.uk_aq_rpc_observs_day_has_rows`
 
 Partition DDL RPCs should run with explicit SQL timeouts:
 - `uk_aq_rpc_observs_ensure_daily_partitions`
