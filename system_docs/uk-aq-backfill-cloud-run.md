@@ -197,6 +197,8 @@ RPC tuning:
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_BASE_URL` (default `https://archive.sensor.community`)
 - `UK_AQ_BACKFILL_SCOMM_INCLUDE_MET_FIELDS` (default `true`)
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_TIMEOUT_MS` (default `120000`)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_FETCH_RETRIES` (default `3`; retries Sensor.Community index/CSV fetches on transient HTTP/network errors)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_RETRY_BASE_MS` (default `1500`; linear retry backoff base delay in ms)
 - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT` (optional local replay mirror)
 - `UK_AQ_R2_HISTORY_PART_MAX_ROWS` (default `1000000`)
 - `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE` (default `100000`)
@@ -217,7 +219,7 @@ Ledger:
 
 - `UK_AQ_BACKFILL_LEDGER_ENABLED` (default `true`)
 - `UK_AQ_BACKFILL_DRY_RUN_WRITE_LEDGER` (default `false`)
-- `UK_AQ_BACKFILL_OPS_SCHEMA` (default `uk_aq_ops`)
+- `UK_AQ_BACKFILL_OPS_SCHEMA` (default `uk_aq_public`; compatible views over `uk_aq_ops` backfill tables)
 
 ## Ledger Schema
 
@@ -231,6 +233,13 @@ Included tables:
 - `uk_aq_ops.backfill_run_days`
 - `uk_aq_ops.backfill_checkpoints`
 - `uk_aq_ops.backfill_errors`
+
+Data API compatibility views:
+
+- `uk_aq_public.backfill_runs`
+- `uk_aq_public.backfill_run_days`
+- `uk_aq_public.backfill_checkpoints`
+- `uk_aq_public.backfill_errors`
 
 If these tables are unavailable, the worker still runs but skip/checkpoint persistence is limited.
 

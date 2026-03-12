@@ -30,6 +30,8 @@ Full setup/runbook remains here:
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_BASE_URL` (default `https://archive.sensor.community`)
 - `UK_AQ_BACKFILL_SCOMM_INCLUDE_MET_FIELDS` (`true|false`, default `true`)
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_TIMEOUT_MS` (default `120000`)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_FETCH_RETRIES` (default `3`)
+- `UK_AQ_BACKFILL_SCOMM_ARCHIVE_RETRY_BASE_MS` (default `1500`)
 - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT` (optional local mirror root for archive CSV replay)
 - `UK_AQ_BACKFILL_REQUEST_TIMEOUT_SECONDS` (default `300`)
 - `UK_AQ_BACKFILL_ID_TOKEN` (if unset, script tries `gcloud auth print-identity-token --audiences "${UK_AQ_BACKFILL_SERVICE_URL}"`, then falls back to `gcloud auth print-identity-token`)
