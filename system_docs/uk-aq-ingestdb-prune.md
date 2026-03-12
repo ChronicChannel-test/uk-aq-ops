@@ -183,3 +183,4 @@ For deployment and scheduler wiring, use:
 
 - `README.md`
 - `.github/workflows/uk_aq_prune_daily_cloud_run_deploy.yml`
+- Scheduler attempt deadline variable: `GCP_UK_AQ_PRUNE_DAILY_SCHEDULER_ATTEMPT_DEADLINE` (fallback aliases accepted), default `15m`.
