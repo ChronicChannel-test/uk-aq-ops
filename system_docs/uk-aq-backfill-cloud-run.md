@@ -137,9 +137,11 @@ Shared behavior:
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
 - Supports optional local archive mirroring for replay/dev:
-  - `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (SOS JSON payloads).
+  - `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (SOS JSON payloads; exact empty payloads such as `{"values":[]}` are recorded in a per-day `_no_data_timeseries.json` manifest instead of per-timeseries files).
   - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT`.
   - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` (local runs only).
+  - legacy empty SOS per-timeseries files can be migrated with:
+    - `node scripts/backup_r2/uk_aq_cleanup_sos_empty_mirror_files.mjs --apply`
 - Local monthly wrapper follow-up:
   - after a successful non-dry `source_to_r2` monthly batch run, `scripts/uk_aq_backfill_local_monthly.sh`
     rebuilds the derived R2 history index manifests:
@@ -237,7 +239,7 @@ RPC tuning:
 - `UK_AQ_BACKFILL_UK_AIR_SOS_FETCH_RETRIES` (default `3`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_RETRY_BASE_MS` (default `1500`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_FETCH_CONCURRENCY` (default `5`)
-- `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (optional local replay mirror for SOS JSON payloads)
+- `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (optional local replay mirror for SOS JSON payloads; exact empty payloads are recorded in `day_utc=YYYY-MM-DD/_no_data_timeseries.json`)
 - `UK_AQ_BACKFILL_SCOMM_SOURCE_ENABLED` (default `true`)
 - `UK_AQ_BACKFILL_SCOMM_CONNECTOR_CODE` (default `sensorcommunity`)
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_BASE_URL` (default `https://archive.sensor.community`)
