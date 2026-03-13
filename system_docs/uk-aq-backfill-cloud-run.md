@@ -136,7 +136,7 @@ Shared behavior:
 Status behavior:
 
 - `dry_run=true`: `dry_run`.
-- non-dry with pending unsupported connector acquisition days: `stubbed`.
+- non-dry with pending source acquisition days (for example unsupported connectors or transient Sensor.Community archive outages): `stubbed`.
 - non-dry with no pending days and no connector/day errors: `ok`.
 - connector/day processing errors: `error`.
 
@@ -144,7 +144,7 @@ Status behavior:
 
 - `ok`: completed for requested scope.
 - `dry_run`: completed planning mode with no writes.
-- `stubbed`: completed with intentionally unimplemented branch.
+- `stubbed`: completed with pending source acquisition or another intentionally incomplete branch.
 - `error`: failed.
 
 ## Required Runtime Variables and Secrets

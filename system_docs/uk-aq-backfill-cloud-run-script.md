@@ -3,6 +3,7 @@
 Quick invocation guide for the ops helper script:
 
 - `scripts/gcp/uk_aq_backfill_cloud_run_call.sh`
+- `scripts/uk_aq_backfill_local_monthly.sh` (local month-by-month wrapper for `run_job.ts`)
 
 Full setup/runbook remains here:
 
@@ -123,6 +124,43 @@ UK_AQ_BACKFILL_FORCE_REPLACE="true" \
 - `UK_AQ_BACKFILL_FROM_DAY_UTC`, `UK_AQ_BACKFILL_TO_DAY_UTC`, `UK_AQ_BACKFILL_CONNECTOR_IDS`, and `UK_AQ_BACKFILL_STATION_IDS` can all be passed inline in the command (examples above).
 - When `UK_AQ_BACKFILL_STATION_ID(S)` is supplied, the worker resolves `connector_id` + `station_ref` from ingest metadata and scopes backfill to those stations.
 - All listed parameters can be passed in-command the same way.
+
+## Local Monthly Wrapper (No Cloud Run)
+
+Script:
+
+- `scripts/uk_aq_backfill_local_monthly.sh`
+
+Purpose:
+
+- Split one local backfill window into month-sized runs.
+- Execute `workers/uk_aq_backfill_cloud_run/run_job.ts` once per month.
+- Write one log file per month (default `logs/backfill/monthly/`).
+
+Example: all available source adapters/connectors for 2025
+
+```bash
+export UK_AQ_BACKFILL_TRIGGER_MODE="manual"
+export UK_AQ_BACKFILL_RUN_MODE="source_to_r2"
+export UK_AQ_BACKFILL_DRY_RUN="false"
+export UK_AQ_BACKFILL_FORCE_REPLACE="false"
+export UK_AQ_BACKFILL_FROM_DAY_UTC="2025-01-01"
+export UK_AQ_BACKFILL_TO_DAY_UTC="2025-12-31"
+unset UK_AQ_BACKFILL_CONNECTOR_IDS
+
+./scripts/uk_aq_backfill_local_monthly.sh
+```
+
+Optional wrapper env vars:
+
+- `UK_AQ_BACKFILL_MONTHLY_LOG_DIR` (default `logs/backfill/monthly`)
+- `UK_AQ_BACKFILL_MONTHLY_STOP_ON_ERROR` (`true|false`, default `true`)
+- `UK_AQ_BACKFILL_MONTHLY_PAUSE_SECONDS` (default `0`)
+
+Behavior with future connectors and `UK_AQ_BACKFILL_FORCE_REPLACE=false`:
+
+- Existing backed-up connector/day outputs are skipped.
+- Newly available supported connectors are processed for missing connector/day outputs.
 
 ## Original Example (export style)
 

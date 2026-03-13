@@ -97,3 +97,7 @@ Partition DDL RPCs should run with explicit SQL timeouts:
 - `uk_aq_rpc_observs_enforce_hot_cold_indexes`
 - `statement_timeout = '15min'`
 - `lock_timeout = '5s'`
+
+Worker retry behavior:
+- transient DDL lock conflicts (`lock timeout`, `deadlock detected`, serialization retries, statement-timeout cancellation) are retried up to `3` times
+- retry delay is linear backoff starting at `1500 ms`
