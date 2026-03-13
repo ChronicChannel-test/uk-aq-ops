@@ -27,6 +27,12 @@ Bucket key is:
 - Phase B writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.history_candidates`
   - `uk_aq_ops.prune_day_gates.history_done`
+- After a successful non-dry Phase B history export, the service rebuilds derived R2 index manifests from committed day manifests:
+  - `history/_index/observations_latest.json`
+  - `history/_index/aqilevels_latest.json`
+- Index rebuild is best-effort:
+  - failures are logged as `phase_b_history_index_rebuild_failed`
+  - prune compare/delete work continues, so core prune safety is not blocked by index refresh drift
 - `uk_aq_ops.prune_day_gates.history_done` continues to gate prune deletes using observation backup completion.
 - Legacy staging objects are still cleaned up by retention policy (`history/v1/_ops/observations/staging/...`) to drain old runs.
 - Prune deletion for an hour bucket is allowed only when that bucket day has `history_done=true`.
@@ -162,6 +168,7 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
+- `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
 
 Phase B required env/secrets:
