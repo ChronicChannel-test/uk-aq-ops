@@ -12,6 +12,8 @@ This deploys a dedicated Cloud Run service that enforces rolling retention for `
 - delete only confirmed complete days from:
   - `uk_aq_aqilevels.station_aqi_hourly`
   - `uk_aq_aqilevels.station_aqi_daily`
+- after a successful delete, best-effort remove the matching current day-count row via `uk_aq_rpc_obs_aqidb_day_count_delete('aqilevels', day_utc)`
+  - failures are logged as warnings only because hourly/daily day-count refresh jobs will reconcile later
 
 If manifest is missing/unconfirmed for a day, that day is skipped.
 
@@ -56,3 +58,13 @@ curl -X POST "http://localhost:8080/run?dropDryRun=true"
 ## Scheduler
 
 Recommended schedule: `15 3 * * *` with timezone `UTC`.
+
+## SQL prerequisites
+
+Apply in obs_aqidb:
+- `../CIC-Test-UK-AQ-Schema/CIC-test-uk-aq-schema/schemas/obs_aqi_db/uk_aq_obs_aqidb_day_counts_current.sql`
+
+The service expects these RPCs to exist:
+- `uk_aq_public.uk_aq_rpc_aqilevels_drop_candidates`
+- `uk_aq_public.uk_aq_rpc_aqilevels_drop_day`
+- `uk_aq_public.uk_aq_rpc_obs_aqidb_day_count_delete`

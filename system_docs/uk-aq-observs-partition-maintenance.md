@@ -21,6 +21,8 @@ This deploys a dedicated Cloud Run service that maintains `uk_aq_observs.observa
     - if the day has no rows: drop the empty partition
     - if `uk_aq_rpc_observs_day_has_rows` is missing from PostgREST schema cache, fallback check uses `uk_aq_rpc_observations_hourly_fingerprint` for that UTC day
   - if not confirmed, skip drop and log `SKIP DROP — history manifest not confirmed`
+- after a successful partition drop, best-effort delete the matching row from `uk_aq_ops.obs_aqidb_day_counts_current` via `uk_aq_rpc_obs_aqidb_day_count_delete('observs', day_utc)`
+  - failures are logged as warnings only because hourly/daily day-count refresh jobs will reconcile later
 
 ## Required environment variables
 
@@ -89,6 +91,7 @@ The service expects these RPCs to exist:
 - `uk_aq_public.uk_aq_rpc_observs_observations_default_diagnostics`
 - `uk_aq_public.uk_aq_rpc_observs_drop_candidates`
 - `uk_aq_public.uk_aq_rpc_observs_drop_partition`
+- `uk_aq_public.uk_aq_rpc_obs_aqidb_day_count_delete`
 - `uk_aq_public.uk_aq_rpc_observs_day_has_rows`
 - `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint` (fallback when `day_has_rows` is unavailable in schema cache)
 
