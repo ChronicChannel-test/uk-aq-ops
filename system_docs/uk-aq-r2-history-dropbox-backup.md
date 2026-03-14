@@ -7,6 +7,7 @@ This document describes the Phase 7 daily incremental backup from Cloudflare R2 
 - Source of truth for completed days: committed day manifest in R2 History.
 - Copy only new completed UTC days since previous successful copies.
 - Preserve exact R2 key layout in Dropbox.
+- Mirror the derived history index manifests used by the history-days fast path.
 
 ## Layout
 
@@ -19,6 +20,11 @@ Mirrored domain paths:
 - `history/v1/observations/day_utc=YYYY-MM-DD/...`
 - `history/v1/aqilevels/day_utc=YYYY-MM-DD/...`
 - `history/v1/core/day_utc=YYYY-MM-DD/...`
+
+Mirrored derived index files:
+
+- `history/_index/observations_latest.json`
+- `history/_index/aqilevels_latest.json`
 
 Checkpoint path (default):
 
@@ -42,6 +48,7 @@ The script:
 4. Uses `rclone copy` for day-folder copy operations.
 5. Verifies copied manifest hash at destination.
 6. Updates checkpoint state after each successful day.
+7. Compares derived `history/_index/*.json` manifest hashes and copies changed files into Dropbox after the day-folder sync completes.
 
 ## Workflow
 
@@ -152,6 +159,7 @@ Variables:
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
+- `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
 - `UK_AQ_R2_HISTORY_DROPBOX_DIR` (default `R2_history_backup`)
 - `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (default `_ops/checkpoints/r2_history_backup_state_v1.json`)
