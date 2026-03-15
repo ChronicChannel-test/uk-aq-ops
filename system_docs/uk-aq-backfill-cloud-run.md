@@ -6,7 +6,7 @@ Current status (Phase 9, incremental):
 
 - `local_to_aqilevels`: implemented and production runnable.
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
-- `source_to_r2`: UK-AIR SOS + Sensor.Community + OpenAQ source adapters implemented for source-to-R2 writes.
+- `source_to_r2`: UK-AIR SOS + Breathe London + Sensor.Community + OpenAQ source adapters implemented for source-to-R2 writes.
 
 ## Runtime Components
 
@@ -147,6 +147,9 @@ Shared behavior:
   - then writes day manifests:
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
+- Source fetch retries:
+  - all source adapters use bounded per-request HTTP retries for transient network and retryable HTTP failures.
+  - UK-AIR SOS also retries only the residual transient failed timeseries at reduced concurrency before the connector/day is marked failed.
 - transient R2 request failures during upload/verification are retried automatically with bounded backoff before a connector/day is marked failed.
 - Supports optional local archive mirroring for replay/dev:
   - `UK_AQ_BACKFILL_BREATHELONDON_RAW_MIRROR_ROOT`.
@@ -268,6 +271,8 @@ RPC tuning:
 - `UK_AQ_BACKFILL_UK_AIR_SOS_FETCH_RETRIES` (default `3`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_RETRY_BASE_MS` (default `1500`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_FETCH_CONCURRENCY` (default `5`)
+- `UK_AQ_BACKFILL_UK_AIR_SOS_TIMESERIES_RETRY_ROUNDS` (default `2`; retry passes for transient failed timeseries after the per-request retry budget is exhausted)
+- `UK_AQ_BACKFILL_UK_AIR_SOS_TIMESERIES_RETRY_BASE_MS` (default `5000`; base delay in ms between SOS retry rounds)
 - `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (optional local replay mirror for SOS JSON payloads; exact empty payloads are recorded in `day_utc=YYYY-MM-DD/_no_data_timeseries.json`)
 - `UK_AQ_BACKFILL_SCOMM_SOURCE_ENABLED` (default `true`)
 - `UK_AQ_BACKFILL_SCOMM_CONNECTOR_CODE` (default `sensorcommunity`)
