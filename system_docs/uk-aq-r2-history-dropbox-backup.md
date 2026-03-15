@@ -235,6 +235,56 @@ node scripts/backup_r2/uk_aq_history_counts_compare.mjs \
   --out ./logs/history-counts-mismatch.csv
 ```
 
+## Sensor.Community exact archive reconciliation
+
+Script:
+
+- `scripts/backup_r2/uk_aq_sensorcommunity_archive_reconcile.mjs`
+
+Purpose:
+
+- Compare Sensor.Community daily archive CSV rows to local `history/v1/observations` parquet rows exactly, not just by daily totals.
+- Uses the local R2 core `timeseries` snapshot to map archive rows into the same logical `timeseries_ref` keys used by history.
+- Compares row multisets on:
+  - `timeseries_ref`
+  - `observed_at`
+  - `value`
+- Reports:
+  - exact match / not exact match
+  - rows missing from observations history
+  - rows unexpectedly present in observations history
+  - mismatch samples
+  - archive-side and observation-side counts by pollutant
+
+Important caveat:
+
+- This script reconciles against local observations history parquet under the Dropbox backup root, not directly against live Obs AQI DB rows.
+- Exact comparison is only as complete as the core snapshot bindings used for the day. The script reports any current-core rows it could not map.
+
+Run a whole-day check:
+
+```bash
+node scripts/backup_r2/uk_aq_sensorcommunity_archive_reconcile.mjs \
+  --day 2026-02-16
+```
+
+Run JSON output and save it:
+
+```bash
+node scripts/backup_r2/uk_aq_sensorcommunity_archive_reconcile.mjs \
+  --day 2026-02-16 \
+  --format json \
+  --out ./logs/scomm-reconcile-2026-02-16.json
+```
+
+Run a single-station check:
+
+```bash
+node scripts/backup_r2/uk_aq_sensorcommunity_archive_reconcile.mjs \
+  --day 2026-02-16 \
+  --station-ref 33987
+```
+
 ## Restore (Dropbox -> R2 History)
 
 Script:
