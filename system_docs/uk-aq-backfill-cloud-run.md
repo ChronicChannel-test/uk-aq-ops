@@ -79,6 +79,7 @@ Implemented as a real export/write path.
   - day manifest under:
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
+- transient R2 request failures during upload/verification are retried automatically with bounded backoff before a connector/day is marked failed.
 - Honors `force_replace=true` by re-exporting selected connector/day payloads.
 - Safety guards for partial-day prevention:
   - when `connector_ids` filter is used, export is blocked if non-target connectors for that day do not already have connector manifests;
@@ -109,6 +110,16 @@ Implemented source adapters:
   - source acquisition from `https://archive.sensor.community/YYYY-MM-DD/`.
   - archive files filtered by known core `station_ref` (Sensor.Community `sensor_id`).
   - unknown archive station refs are logged.
+- Breathe London
+  - source acquisition from the Breathe London API directly.
+  - candidate site universe comes from `/ListSensors`.
+  - day/site requests use the current working hourly endpoint:
+    - `/getClarityData/<SiteCode>/<Species>/<Start>/<End>/Hourly`
+  - source mapping follows project metadata:
+    - `station_ref = Breathe London SiteCode`
+    - `timeseries_ref = <SiteCode>:IPM25|INO2`
+  - optional local raw mirror reuses/saves per-request JSON files under:
+    - `day_utc=YYYY-MM-DD/<SiteCode>_<Species>.json`
 - OpenAQ (phase 1)
   - source acquisition from OpenAQ public AWS archive only:
     - `records/csv.gz/locationid=<LOCATION_ID>/year=<YYYY>/month=<MM>/location-<LOCATION_ID>-<YYYYMMDD>.csv.gz`
@@ -136,7 +147,9 @@ Shared behavior:
   - then writes day manifests:
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
+- transient R2 request failures during upload/verification are retried automatically with bounded backoff before a connector/day is marked failed.
 - Supports optional local archive mirroring for replay/dev:
+  - `UK_AQ_BACKFILL_BREATHELONDON_RAW_MIRROR_ROOT`.
   - `UK_AQ_BACKFILL_SOS_RAW_MIRROR_ROOT` (SOS JSON payloads; exact empty payloads such as `{"values":[]}` are recorded in a per-day `_no_data_timeseries.json` manifest instead of per-timeseries files).
   - `UK_AQ_BACKFILL_SCOMM_RAW_MIRROR_ROOT`.
   - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` (local runs only).
@@ -148,6 +161,13 @@ Shared behavior:
     - `history/_index/observations_latest.json`
     - `history/_index/aqilevels_latest.json`
   - rebuild is done from committed day manifests only, via `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
+  - per-month log files include the wrapper run start time and connector filter:
+    - `<run_mode>_<run_started_at_utc>_<connector_ids_or_all>_<month_from>_to_<month_to>.log`
+    - `run_started_at_utc` format: `YYYY-MM-DD_HH-MM-SS`
+  - optional month-to-month pause:
+    - `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS`
+    - `0` or unset means no pause
+    - legacy alias: `UK_AQ_BACKFILL_MONTHLY_PAUSE_SECONDS`
 - Station-targeted scope:
   - accept `station_id` / `station_ids`,
   - resolve `connector_id` + `station_ref` from ingest `uk_aq_core.stations`,
@@ -230,6 +250,15 @@ RPC tuning:
 - `UK_AQ_BACKFILL_OBS_R2_MAX_PAGES` (default `50000`; safety ceiling for obs/aqi history export pagination)
 - `UK_AQ_BACKFILL_R2_CORE_LOOKBACK_DAYS` (default `45`)
 - `UK_AQ_BACKFILL_R2_CORE_SNAPSHOT_MAX_BYTES` (default `250000000`)
+- `UK_AQ_BACKFILL_BREATHELONDON_SOURCE_ENABLED` (default `true`)
+- `UK_AQ_BACKFILL_BREATHELONDON_CONNECTOR_CODE` (default `breathelondon`)
+- `UK_AQ_BACKFILL_BREATHELONDON_CONNECTOR_ID_FALLBACK` (default `3`)
+- `UK_AQ_BACKFILL_BREATHELONDON_BASE_URL` (default `https://api.breathelondon-communities.org/api`)
+- `BREATHELONDON_API_KEY` (required when Breathe London source backfill is enabled)
+- `UK_AQ_BACKFILL_BREATHELONDON_TIMEOUT_MS` (default `60000`)
+- `UK_AQ_BACKFILL_BREATHELONDON_FETCH_RETRIES` (default `3`)
+- `UK_AQ_BACKFILL_BREATHELONDON_RETRY_BASE_MS` (default `1500`)
+- `UK_AQ_BACKFILL_BREATHELONDON_RAW_MIRROR_ROOT` (optional local replay mirror for Breathe London per-request JSON files)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_SOURCE_ENABLED` (default `true`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_CONNECTOR_CODE` (default `uk_air_sos`)
 - `UK_AQ_BACKFILL_UK_AIR_SOS_CONNECTOR_ID_FALLBACK` (default `1`)

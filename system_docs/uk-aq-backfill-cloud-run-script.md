@@ -28,6 +28,15 @@ Full setup/runbook remains here:
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`; used for R2 core metadata lookup)
 - `UK_AQ_BACKFILL_R2_CORE_LOOKBACK_DAYS` (default `45`)
 - `UK_AQ_BACKFILL_R2_CORE_SNAPSHOT_MAX_BYTES` (default `250000000`)
+- `UK_AQ_BACKFILL_BREATHELONDON_SOURCE_ENABLED` (`true|false`, default `true`)
+- `UK_AQ_BACKFILL_BREATHELONDON_CONNECTOR_CODE` (default `breathelondon`)
+- `UK_AQ_BACKFILL_BREATHELONDON_CONNECTOR_ID_FALLBACK` (default `3`)
+- `UK_AQ_BACKFILL_BREATHELONDON_BASE_URL` (default `https://api.breathelondon-communities.org/api`)
+- `BREATHELONDON_API_KEY` (required when Breathe London source backfill is enabled)
+- `UK_AQ_BACKFILL_BREATHELONDON_TIMEOUT_MS` (default `60000`)
+- `UK_AQ_BACKFILL_BREATHELONDON_FETCH_RETRIES` (default `3`)
+- `UK_AQ_BACKFILL_BREATHELONDON_RETRY_BASE_MS` (default `1500`)
+- `UK_AQ_BACKFILL_BREATHELONDON_RAW_MIRROR_ROOT` (optional local mirror root for Breathe London day/site/species JSON replay)
 - `UK_AQ_BACKFILL_SCOMM_SOURCE_ENABLED` (`true|false`, default `true`)
 - `UK_AQ_BACKFILL_SCOMM_CONNECTOR_CODE` (default `sensorcommunity`)
 - `UK_AQ_BACKFILL_SCOMM_ARCHIVE_BASE_URL` (default `https://archive.sensor.community`)
@@ -136,6 +145,9 @@ Purpose:
 - Split one local backfill window into month-sized runs.
 - Execute `workers/uk_aq_backfill_cloud_run/run_job.ts` once per month.
 - Write one log file per month (default `logs/backfill/monthly/`).
+  - pattern: `<run_mode>_<run_started_at_utc>_<connector_ids_or_all>_<month_from>_to_<month_to>.log`
+  - `run_started_at_utc` format: `YYYY-MM-DD_HH-MM-SS`
+  - example: `source_to_r2_2026-03-14_14-05-12_3_2026-01-01_to_2026-01-31.log`
 
 Example: all available source adapters/connectors for 2025
 
@@ -155,7 +167,8 @@ Optional wrapper env vars:
 
 - `UK_AQ_BACKFILL_MONTHLY_LOG_DIR` (default `logs/backfill/monthly`)
 - `UK_AQ_BACKFILL_MONTHLY_STOP_ON_ERROR` (`true|false`, default `true`)
-- `UK_AQ_BACKFILL_MONTHLY_PAUSE_SECONDS` (default `0`)
+- `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS` (default `0`; pause between monthly runs, applies to all connectors)
+- `UK_AQ_BACKFILL_MONTHLY_PAUSE_SECONDS` (legacy alias for `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS`)
 
 Behavior with future connectors and `UK_AQ_BACKFILL_FORCE_REPLACE=false`:
 
