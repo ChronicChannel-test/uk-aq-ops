@@ -4,7 +4,7 @@ This document describes what the prune function does at runtime.
 
 ## Purpose
 
-`POST /run` verifies that ingest observations older than 7 days are present in history with identical content, then deletes only verified ingest buckets.
+`POST /run` verifies that ingest observations older than the configured ingest retention window are present in history with identical content, then deletes only verified ingest buckets.
 
 Bucket key is:
 
@@ -19,7 +19,8 @@ Bucket key is:
 - If `MAX_HOURS_PER_RUN > 24`, split into sequential 24-hour internal batches and process each batch in order.
 
 0. Phase B pre-prune history gate:
-- Before fingerprint compare/delete work, the service runs Phase B R2 History export for closed UTC days (`day_utc <= utc_today - 8 days`).
+- Before fingerprint compare/delete work, the service runs Phase B R2 History export for closed UTC days through `utc_today - (INGESTDB_RETENTION_DAYS + 1 days)`.
+- Example: on `2026-03-17`, with `INGESTDB_RETENTION_DAYS=7`, latest eligible day is `2026-03-09`; with `INGESTDB_RETENTION_DAYS=5`, latest eligible day is `2026-03-11`.
 - Observations source rows are streamed through server-side projection function `uk_aq_ops.uk_aq_phase_b_history_rows` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
 - Observations part rollover defaults to `1,000,000` rows per file.
 - Observations write each part directly to committed prefix (`history/v1/observations/...`) and persist resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
@@ -150,7 +151,7 @@ Required:
 Key optional controls:
 
 - `INGESTDB_PRUNE_DRY_RUN` (default `true`)
-- `INGESTDB_RETENTION_DAYS` (default `7`)
+- `INGESTDB_RETENTION_DAYS` (default `5`)
 - `MAX_HOURS_PER_RUN` (default `48`)
 - `DELETE_BATCH_SIZE` (default `50000`)
 - `MAX_DELETE_BATCHES_PER_HOUR` (default `10`)
@@ -170,6 +171,9 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
+
+Website observation API note:
+- `uk_aq_timeseries` now uses `obs_aqidb` for the recent `14`-day local window before R2 fallback. Keep `obs_aqidb` retention at `14` days or more if the website should continue to serve that full local recent window.
 
 Phase B required env/secrets:
 
