@@ -173,7 +173,7 @@ Key optional controls:
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
 
 Website observation API note:
-- `uk_aq_timeseries` now uses `obs_aqidb` for the recent `14`-day local window before R2 fallback. Keep `obs_aqidb` retention at `14` days or more if the website should continue to serve that full local recent window.
+- `uk_aq_timeseries` now uses ingestdb for the freshest `24` hours, `obs_aqidb` for the next `13` days inside the local `14`-day window, and R2 for older history. Keep `obs_aqidb` retention at `14` days or more if the website should continue to serve that full local recent window, and keep ingestdb available for the freshest local slice.
 
 Phase B required env/secrets:
 
