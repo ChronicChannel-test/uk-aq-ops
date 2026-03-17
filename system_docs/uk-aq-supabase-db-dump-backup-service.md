@@ -85,6 +85,8 @@ Retention is applied separately to the `ingestdb` and `obs_aqidb` dated folders.
   - `scripts/gcp/uk_aq_supabase_db_dump_backup_deploy.sh`
 - Scheduler script:
   - `scripts/gcp/uk_aq_supabase_db_dump_backup_scheduler.sh`
+- GitHub Actions deploy workflow:
+  - `.github/workflows/uk_aq_supabase_db_dump_backup_service_deploy.yml`
 
 ## Required Secret Manager secrets
 
@@ -176,6 +178,14 @@ The deploy script:
 5. deploys the Cloud Run service
 6. grants `roles/run.invoker` to the invoker service account
 
+GitHub Actions alternative:
+
+- `.github/workflows/uk_aq_supabase_db_dump_backup_service_deploy.yml`
+- deploys the same Cloud Run service from repo vars/secrets
+- syncs DB URL + Dropbox secrets into GCP Secret Manager
+- grants the runtime service account Secret Manager access for those required secrets
+- can also create/update the daily Cloud Scheduler trigger
+
 ## Scheduler
 
 Create or update the daily scheduler job:
@@ -200,6 +210,63 @@ The scheduler job sends:
 - URI: `${SERVICE_URL}/run-backup`
 - body: `{"trigger_mode":"scheduler"}`
 - auth: OIDC using the invoker service account
+
+## GitHub Actions deploy workflow
+
+Workflow path:
+
+- `.github/workflows/uk_aq_supabase_db_dump_backup_service_deploy.yml`
+
+Required GitHub repo variables:
+
+- `GCP_PROJECT_ID`
+- `UK_AQ_DROPBOX_ROOT`
+
+Google auth config for the workflow:
+
+- recommended: `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT`
+- fallback: `GCP_SA_KEY` GitHub secret
+
+Optional GitHub repo variables:
+
+- `GCP_REGION` default `europe-west2`
+- `GCP_ARTIFACT_REPO` default `uk-aq`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_NAME` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_NAME`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_ACCOUNT` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_ACCOUNT`
+- `GCP_OPS_JOB_SERVICE_ACCOUNT` fallback runtime service account
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_TIMEOUT_SECONDS` default `1800`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_CPU` default `2`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_MEMORY` default `2Gi`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_CONCURRENCY` default `1`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_MAX_INSTANCES` default `1`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_MIN_INSTANCES` default `0`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SERVICE_INGRESS` default `internal`
+- `UK_AQ_SUPABASE_DB_DUMP_BACKUP_DIR` default `Supabase_Backup_db_dump`
+- `UK_AQ_SUPABASE_DB_DUMP_RETENTION_DAYS` default `7`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_ENABLED` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_ENABLED` default `true`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_JOB_NAME` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_JOB_NAME` default `uk-aq-db-dump-backup-trigger`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_CRON` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_CRON` default `55 0 * * *`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_TIMEZONE` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_TIMEZONE` default `UTC`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_ATTEMPT_DEADLINE` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_ATTEMPT_DEADLINE` default `1800s`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_MAX_RETRY_ATTEMPTS` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_MAX_RETRY_ATTEMPTS` default `0`
+- `GCP_UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_SERVICE_ACCOUNT` or `UK_AQ_SUPABASE_DB_DUMP_BACKUP_SCHEDULER_SERVICE_ACCOUNT` default runtime service account
+- `UK_AQ_INGESTDB_DB_URL_SECRET_NAME` default `UK_AQ_INGESTDB_DB_URL`
+- `UK_AQ_OBS_AQIDB_DB_URL_SECRET_NAME` default `UK_AQ_OBS_AQIDB_DB_URL`
+- `DROPBOX_APP_KEY_SECRET_NAME` default `DROPBOX_APP_KEY`
+- `DROPBOX_APP_SECRET_SECRET_NAME` default `DROPBOX_APP_SECRET`
+- `DROPBOX_REFRESH_TOKEN_SECRET_NAME` default `DROPBOX_REFRESH_TOKEN`
+
+Required GitHub repo secrets:
+
+- `DROPBOX_APP_KEY`
+- `DROPBOX_APP_SECRET`
+- `DROPBOX_REFRESH_TOKEN`
+- `UK_AQ_INGESTDB_DB_URL` or fallback `SUPABASE_DB_URL`
+- `UK_AQ_OBS_AQIDB_DB_URL` or fallback `OBS_AQIDB_SUPABASE_DB_URL`
+
+Optional fallback GitHub secret:
+
+- `GCP_SA_KEY` when Workload Identity Federation is not used
 
 ## Why ingress is internal
 
