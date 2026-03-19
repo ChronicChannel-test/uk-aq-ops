@@ -46,6 +46,9 @@ Window split behavior:
   - recent segment -> ObsAQIDB live table/view.
 - overlapping timestamps are de-duplicated by hour, with ObsAQIDB rows winning.
 - if the recent ObsAQIDB read fails, the worker falls back to R2 for that same recent window instead of failing the whole request.
+- cache TTL is also dynamic by the requested end time:
+  - requests ending within the last 24 hours use the short live TTL
+  - requests ending more than 24 hours ago use the long immutable-history TTL
 
 ## Auth
 
@@ -79,6 +82,7 @@ Variables:
 
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX=history/v1/aqilevels`
 - `UK_AQ_AQI_HISTORY_R2_CACHE_MAX_AGE_SECONDS=300`
+- `UK_AQ_AQI_HISTORY_R2_IMMUTABLE_CACHE_MAX_AGE_SECONDS=86400`
 - `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS=168` (default)
 - `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
 
@@ -97,3 +101,4 @@ Coverage metadata includes the live/fallback status for the recent window:
 - `coverage.obs_aqidb_status`: `not_requested`, `live`, or `history_fallback`
 - `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
+- top-level `cache_scope`: `recent` or `immutable`

@@ -29,6 +29,9 @@ Read endpoints:
 - `/api/aq/la-hex` -> `uk_aq_la_hex`
 - `/api/aq/pcon-hex` -> `uk_aq_pcon_hex`
 - `/api/aq/aqi-history` -> external AQI history R2 API URL (`UK_AQ_AQI_HISTORY_R2_API_URL`)
+  - cache policy is dynamic by requested end time:
+    - requests ending within the last 24 hours use the short realtime profile
+    - requests ending more than 24 hours ago use a long immutable-history profile
 
 ## Required GitHub env/secret targets
 
