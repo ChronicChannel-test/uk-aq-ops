@@ -45,6 +45,7 @@ Window split behavior:
   - older segment -> R2 history, and
   - recent segment -> ObsAQIDB live table/view.
 - overlapping timestamps are de-duplicated by hour, with ObsAQIDB rows winning.
+- if the recent ObsAQIDB read fails, the worker falls back to R2 for that same recent window instead of failing the whole request.
 
 ## Auth
 
@@ -88,3 +89,11 @@ Cache proxy route `/api/aq/aqi-history` should target this worker via:
 - GitHub variable `UK_AQ_AQI_HISTORY_R2_API_URL=https://<worker-host>/v1/aqi-history`
 
 Do not point `UK_AQ_AQI_HISTORY_R2_API_URL` back to `/api/aq/aqi-history` (would recurse).
+
+## Response diagnostics
+
+Coverage metadata includes the live/fallback status for the recent window:
+
+- `coverage.obs_aqidb_status`: `not_requested`, `live`, or `history_fallback`
+- `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
+- `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
