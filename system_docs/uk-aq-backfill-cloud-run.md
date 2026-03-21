@@ -8,6 +8,10 @@ Current status (Phase 9, incremental):
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
 - `source_to_r2`: UK-AIR SOS + Breathe London + Sensor.Community + OpenAQ source adapters implemented for source-to-R2 writes.
 
+Canonical R2 object tree and manifest/index payload shapes:
+
+- `system_docs/uk-aq-r2-history-layout.md`
+
 ## Runtime Components
 
 - Service entrypoint: `workers/uk_aq_backfill_cloud_run/run_service.ts`
@@ -41,12 +45,15 @@ Main flow:
 1. Resolve `from_day_utc` and `to_day_utc` (default yesterday UTC).
 2. Build inclusive day range and process newest day first.
 3. For each day, compute connector candidates from ingest/obs_aqidb fingerprint RPC counts.
+   - when `enable_r2_fallback=true`, also merge connector ids from the committed observations day manifest in R2 so older history-only days are still discoverable.
 4. For each connector/day choose source by priority:
    - ingest for likely in-retention days,
    - obs_aqidb for older retained days,
    - optional R2 fallback only when enabled.
 5. Fetch source hourly rows and normalize helper shape.
+   - R2 fallback reads committed `history/v1/observations/...` parquet for the target day plus the previous UTC day needed for the rolling 24-hour AQI lookback window, then rebuilds hourly source rows before AQI upsert.
 6. Upsert hourly AQI rows and refresh daily/monthly rollups.
+   - retryable hourly write timeouts split the affected AQI upsert batch into smaller sub-batches automatically before the connector/day is marked failed.
 7. Write structured logs and optional ledger/checkpoints.
 
 Idempotency:
@@ -58,7 +65,9 @@ Idempotency:
 R2 fallback note:
 
 - `enable_r2_fallback=true` can route empty local-source connector/day to `r2`.
-- pull-from-R2 read path is still not implemented in this worker, so those connector/days error with `r2_fallback_not_implemented_in_phase1`.
+- the worker reads committed observation history from:
+  - `history/v1/observations/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet`
+- parquet rows are mapped back through core metadata (`timeseries_id -> station_id + pollutant`) and then passed through the normal AQI rebuild path, so the same current breakpoint logic is used for regenerated AQI rows.
 
 ### `obs_aqi_to_r2`
 
@@ -204,6 +213,14 @@ Secrets:
 - `SB_SECRET_KEY`
 - `OBS_AQIDB_SECRET_KEY`
 
+When `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK=true`, `local_to_aqilevels` also requires the same R2 read credentials used by the export paths:
+
+- `CFLARE_R2_ENDPOINT` (or `R2_ENDPOINT`)
+- `CFLARE_R2_REGION` (or `R2_REGION`, default `auto`)
+- `CFLARE_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
+- `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
+- bucket mapping via `CFLARE_R2_BUCKET` / `R2_BUCKET` or `R2_BUCKET_PROD|R2_BUCKET_STAGE|R2_BUCKET_DEV`
+
 ### Required for `obs_aqi_to_r2` and `source_to_r2` R2 export/write
 
 Variables:
@@ -246,6 +263,7 @@ RPC tuning:
 
 - `UK_AQ_BACKFILL_RPC_RETRIES` (default `3`)
 - `UK_AQ_BACKFILL_HOURLY_UPSERT_CHUNK_SIZE` (default `2000`)
+- `UK_AQ_BACKFILL_HOURLY_UPSERT_MIN_CHUNK_SIZE` (default `250`; timeout retry floor for split hourly AQI upsert batches)
 - `UK_AQ_BACKFILL_STATION_ID_PAGE_SIZE` (default `1000`)
 - `UK_AQ_BACKFILL_SOURCE_RPC_PAGE_SIZE` (default `1000`)
 - `UK_AQ_BACKFILL_SOURCE_RPC_MAX_PAGES` (default `200`)

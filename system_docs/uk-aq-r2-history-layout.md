@@ -1,0 +1,342 @@
+# UK AQ R2 History Layout
+
+This document is the canonical object-layout reference for the UK AQ R2 history bucket.
+
+The SQL schema repo only tracks R2 telemetry such as domain sizes. The actual R2 object tree, manifest shapes, and derived index payloads are defined by the ops writers and readers in this repo.
+
+## Bucket and Top-Level Prefixes
+
+Bucket selection is deployment-specific:
+
+- explicit bucket: `R2_BUCKET` or `CFLARE_R2_BUCKET`
+- otherwise deploy mapping:
+  - `R2_BUCKET_PROD`
+  - `R2_BUCKET_STAGE`
+  - `R2_BUCKET_DEV`
+
+Stable top-level prefixes:
+
+- `history/v1/observations`
+- `history/v1/aqilevels`
+- `history/v1/core`
+- `history/_index`
+
+Operational prefixes:
+
+- `history/v1/_ops/observations/runs`
+- `history/v1/_ops/observations/staging`
+
+## Object Tree
+
+```text
+history/
+  _index/
+    observations_latest.json
+    aqilevels_latest.json
+  v1/
+    observations/
+      day_utc=YYYY-MM-DD/
+        manifest.json
+        connector_id=<id>/
+          manifest.json
+          part-00000.parquet
+          part-00001.parquet
+          ...
+    aqilevels/
+      day_utc=YYYY-MM-DD/
+        manifest.json
+        connector_id=<id>/
+          manifest.json
+          part-00000.parquet
+          part-00001.parquet
+          ...
+    core/
+      day_utc=YYYY-MM-DD/
+        manifest.json
+        checksums.sha256
+        table=<table>/
+          rows.ndjson.gz
+    _ops/
+      observations/
+        runs/
+          run_id=<uuid>/
+            run_manifest.json
+        staging/
+          run_id=<uuid>/
+            ...
+```
+
+## Observations Domain
+
+Committed observations objects live under:
+
+- `history/v1/observations/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet`
+- `history/v1/observations/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+- `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
+
+Current observations parquet schema:
+
+- `history_schema_name`: `observations`
+- `history_schema_version`: `2`
+- `writer_version`: `parquet-wasm-zstd-v2`
+- columns:
+  - `connector_id`
+  - `timeseries_id`
+  - `observed_at`
+  - `value`
+
+Connector manifest fields:
+
+- identity:
+  - `day_utc`
+  - `connector_id`
+  - `run_id`
+- coverage:
+  - `source_row_count`
+  - `min_observed_at`
+  - `max_observed_at`
+- object listing:
+  - `parquet_object_keys`
+  - `file_count`
+  - `total_bytes`
+  - `files`
+- schema metadata:
+  - `history_schema_name`
+  - `history_schema_version`
+  - `columns`
+  - `writer_version`
+  - `writer_git_sha`
+- file-size stats:
+  - `bytes_per_row_estimate`
+  - `avg_file_bytes`
+  - `min_file_bytes`
+  - `max_file_bytes`
+- manifest metadata:
+  - `backed_up_at_utc`
+  - `manifest_hash`
+
+Day manifest fields:
+
+- day-level identity and coverage:
+  - `day_utc`
+  - `connector_ids`
+  - `run_id`
+  - `source_row_count`
+  - `min_observed_at`
+  - `max_observed_at`
+- day-level object listing:
+  - `parquet_object_keys`
+  - `file_count`
+  - `total_bytes`
+  - `files`
+  - `connector_manifests`
+- schema metadata:
+  - `history_schema_name`
+  - `history_schema_version`
+  - `columns`
+  - `writer_version`
+  - `writer_git_sha`
+- file-size stats:
+  - `bytes_per_row_estimate`
+  - `avg_file_bytes`
+  - `min_file_bytes`
+  - `max_file_bytes`
+- manifest metadata:
+  - `backed_up_at_utc`
+  - `manifest_hash`
+
+Notes:
+
+- Parts are written directly to the committed prefix.
+- Connector manifests are written after all parts for that connector/day exist.
+- Day manifests are written only after all connector manifests for that day are available.
+
+## AQI Levels Domain
+
+Committed AQI objects live under:
+
+- `history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet`
+- `history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+- `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+
+Current AQI parquet schema:
+
+- `history_schema_name`: `aqilevels`
+- `history_schema_version`: `1`
+- `writer_version`: `parquet-wasm-zstd-v1`
+- columns:
+  - `connector_id`
+  - `station_id`
+  - `timestamp_hour_utc`
+  - `no2_hourly_mean_ugm3`
+  - `pm25_hourly_mean_ugm3`
+  - `pm10_hourly_mean_ugm3`
+  - `pm25_rolling24h_mean_ugm3`
+  - `pm10_rolling24h_mean_ugm3`
+  - `no2_hourly_sample_count`
+  - `pm25_hourly_sample_count`
+  - `pm10_hourly_sample_count`
+  - `daqi_no2_index_level`
+  - `daqi_pm25_rolling24h_index_level`
+  - `daqi_pm10_rolling24h_index_level`
+  - `eaqi_no2_index_level`
+  - `eaqi_pm25_index_level`
+  - `eaqi_pm10_index_level`
+
+AQI connector/day manifests follow the same overall pattern as observations, but use:
+
+- `min_timestamp_hour_utc`
+- `max_timestamp_hour_utc`
+
+instead of:
+
+- `min_observed_at`
+- `max_observed_at`
+
+## Derived Index Objects
+
+Derived index objects live under:
+
+- `history/_index/observations_latest.json`
+- `history/_index/aqilevels_latest.json`
+
+These are rebuilt from committed day manifests only.
+
+Index payload fields:
+
+- `schema_version`
+- `generated_at`
+- `source`
+- `domain`
+- `bucket`
+- `prefix`
+- `min_day_utc`
+- `max_day_utc`
+- `day_count`
+- `total_rows`
+- `days`
+- `day_summaries`
+
+Each `day_summaries` entry includes:
+
+- `day_utc`
+- `total_rows`
+- `connector_count`
+- `file_count`
+- `total_bytes`
+- `connectors`
+- `run_id`
+- `backed_up_at_utc`
+- `manifest_hash`
+
+Observations summaries also include:
+
+- `min_observed_at`
+- `max_observed_at`
+
+AQI summaries also include:
+
+- `min_timestamp_hour_utc`
+- `max_timestamp_hour_utc`
+
+Each `connectors` entry includes:
+
+- `connector_id`
+- `row_count`
+- `file_count`
+- `total_bytes`
+- `manifest_key`
+
+## Core Snapshot Objects
+
+Core snapshot objects live under:
+
+- `history/v1/core/day_utc=YYYY-MM-DD/manifest.json`
+- `history/v1/core/day_utc=YYYY-MM-DD/checksums.sha256`
+- `history/v1/core/day_utc=YYYY-MM-DD/table=<table>/rows.ndjson.gz`
+
+Core manifest fields:
+
+- `schema_name`: `uk_aq_core_snapshot`
+- `schema_version`: `1`
+- `generated_at_utc`
+- `day_utc`
+- `source_schema`
+- `prefix`
+- `file_format`
+- `tables`
+- `totals`
+- `checksums`
+- `manifest_hash`
+
+Each `tables` entry includes:
+
+- `table`
+- `order_by`
+- `key`
+- `relative_path`
+- `row_count`
+- `uncompressed_bytes`
+- `compressed_bytes`
+- `sha256`
+- `sha256_uncompressed`
+
+## Operational Objects
+
+Run manifests live under:
+
+- `history/v1/_ops/observations/runs/run_id=<uuid>/run_manifest.json`
+
+Run manifest fields:
+
+- `run_id`
+- `backed_up_at_utc`
+- `summary`
+- `manifest_hash`
+
+The `summary` payload is the Phase B run summary returned by the prune worker, including:
+
+- eligible window metadata
+- candidate counts
+- completed and failed previews
+- byte and row totals
+- AQI export summary
+- staging cleanup summary
+
+Staging objects live under:
+
+- `history/v1/_ops/observations/staging/run_id=<uuid>/...`
+
+Notes:
+
+- staging is legacy/operational only
+- current observation export writes committed parts directly under `history/v1/observations/...`
+- staging cleanup is still retained to drain older run artifacts
+
+## What Readers Treat As Committed
+
+Committed public history is defined by day manifests under:
+
+- `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
+- `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+
+Readers and maintenance jobs should treat these as the source of truth for completed days.
+
+Examples:
+
+- prune day gating updates `uk_aq_ops.prune_day_gates.history_done` from committed day manifests
+- R2 API workers read day manifests first, then connector manifests and parquet files
+- Dropbox backup mirrors committed day folders and derived index files exactly
+
+## Non-Goals
+
+This layout doc does not replace database schema docs.
+
+The schema repo still owns:
+
+- DB tables
+- views
+- RPCs
+- R2 telemetry tables such as domain-size metrics
+
+This page only describes the R2 object tree and manifest/index payload shapes.

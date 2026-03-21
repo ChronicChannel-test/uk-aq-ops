@@ -2,6 +2,8 @@
 
 This document describes the Phase 7 daily incremental backup from Cloudflare R2 History to Dropbox.
 
+For the canonical R2 object tree and manifest/index payload shapes, see `system_docs/uk-aq-r2-history-layout.md`.
+
 ## Purpose
 
 - Source of truth for completed days: committed day manifest in R2 History.
