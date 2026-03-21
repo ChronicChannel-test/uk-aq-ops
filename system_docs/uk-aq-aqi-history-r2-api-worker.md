@@ -37,6 +37,9 @@ Optional:
   - alias: `since`
 - `row_limit` (`1..20000`)
   - alias: `limit`
+- `pollutant` (`pm25`, `pm10`, `no2`)
+  - when present, the generic `daqi_index_level` / `eaqi_index_level` fields in each point are set from that pollutant only
+  - pollutant-specific AQI columns are always returned in each point for explicit client-side mapping
 
 Window split behavior:
 
@@ -102,3 +105,22 @@ Coverage metadata includes the live/fallback status for the recent window:
 - `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
 - top-level `cache_scope`: `recent` or `immutable`
+
+## Point payload
+
+Each `points[]` row includes:
+
+- `period_start_utc`
+- `station_id`
+- generic AQI fields:
+  - `daqi_index_level`
+  - `eaqi_index_level`
+- pollutant-specific AQI fields:
+  - `daqi_no2_index_level`
+  - `daqi_pm25_rolling24h_index_level`
+  - `daqi_pm10_rolling24h_index_level`
+  - `eaqi_no2_index_level`
+  - `eaqi_pm25_index_level`
+  - `eaqi_pm10_index_level`
+
+When `pollutant` is omitted, the generic pair remains the max-across-supported-pollutants summary for backward compatibility. New chart clients should read the pollutant-specific fields directly.
