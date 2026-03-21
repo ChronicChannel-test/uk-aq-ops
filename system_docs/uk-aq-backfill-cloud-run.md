@@ -7,6 +7,7 @@ Current status (Phase 9, incremental):
 - `local_to_aqilevels`: implemented and production runnable.
 - `obs_aqi_to_r2`: implemented with dry-run planning plus non-dry export/write.
 - `source_to_r2`: UK-AIR SOS + Breathe London + Sensor.Community + OpenAQ source adapters implemented for source-to-R2 writes.
+- `r2_history_obs_to_aqilevels`: implemented for AQI recalculation directly from committed `history/v1/observations` parquet/manifests, with committed AQI history rewrite back to `history/v1/aqilevels`.
 
 Canonical R2 object tree and manifest/index payload shapes:
 
@@ -168,7 +169,7 @@ Shared behavior:
   - legacy empty SOS per-timeseries files can be migrated with:
     - `node scripts/backup_r2/uk_aq_cleanup_sos_empty_mirror_files.mjs --apply`
 - Local monthly wrapper follow-up:
-  - after a successful non-dry `source_to_r2` monthly batch run, `scripts/uk_aq_backfill_local_monthly.sh`
+  - after a successful non-dry `source_to_r2` or `r2_history_obs_to_aqilevels` monthly batch run, `scripts/uk_aq_backfill_local_monthly.sh`
     rebuilds the derived R2 history index manifests:
     - `history/_index/observations_latest.json`
     - `history/_index/aqilevels_latest.json`
@@ -191,6 +192,24 @@ Status behavior:
 - non-dry with pending source acquisition days (for example unsupported connectors or transient Sensor.Community archive outages): `stubbed`.
 - non-dry with no pending days and no connector/day errors: `ok`.
 - connector/day processing errors: `error`.
+
+### `r2_history_obs_to_aqilevels`
+
+Implemented as an AQI-only R2 history rewrite path.
+
+- Discovers day+connector scope from committed observation day manifests only:
+  - `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
+- Reads committed observation parquet parts only from:
+  - `history/v1/observations/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet`
+- Reuses the same AQI rebuild path already used for source observations:
+  - raw observations -> hourly means/sample counts -> rolling 24-hour PM means -> DAQI/EAQI levels
+- Reads the prior-hour UTC lookback window needed for the first requested output hour, but only writes AQI outputs whose `timestamp_hour_utc` falls inside the requested `from_day_utc .. to_day_utc` window.
+- Writes committed AQI history objects back to:
+  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet`
+  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+- `force_replace=true` removes the existing AQI day manifest before destructive connector rewrites so partial connector refreshes are not left committed.
+- `dry_run=true` performs discovery, manifest checks, row planning, and replacement logging only.
 
 ## Run Status Values
 
@@ -221,7 +240,7 @@ When `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK=true`, `local_to_aqilevels` also require
 - `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
 - bucket mapping via `CFLARE_R2_BUCKET` / `R2_BUCKET` or `R2_BUCKET_PROD|R2_BUCKET_STAGE|R2_BUCKET_DEV`
 
-### Required for `obs_aqi_to_r2` and `source_to_r2` R2 export/write
+### Required for `obs_aqi_to_r2`, `source_to_r2`, and `r2_history_obs_to_aqilevels` R2 history reads/writes
 
 Variables:
 
@@ -242,7 +261,7 @@ Secrets:
 
 Core:
 
-- `UK_AQ_BACKFILL_RUN_MODE=local_to_aqilevels|obs_aqi_to_r2|source_to_r2`
+- `UK_AQ_BACKFILL_RUN_MODE=local_to_aqilevels|obs_aqi_to_r2|source_to_r2|r2_history_obs_to_aqilevels`
 - `UK_AQ_BACKFILL_TRIGGER_MODE=manual|scheduler`
 - `UK_AQ_BACKFILL_DRY_RUN=true|false`
 - `UK_AQ_BACKFILL_FORCE_REPLACE=true|false`
@@ -425,6 +444,21 @@ curl -sS -X POST http://127.0.0.1:8000/run \
     "from_day_utc": "2026-02-11",
     "to_day_utc": "2026-02-15",
     "station_id": 24665
+  }' | jq .
+```
+
+### 5b) Local non-dry AQI rebuild from committed R2 observation history
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/run \
+  -H 'content-type: application/json' \
+  -d '{
+    "trigger_mode": "manual",
+    "run_mode": "r2_history_obs_to_aqilevels",
+    "dry_run": false,
+    "force_replace": true,
+    "from_day_utc": "2025-01-01",
+    "to_day_utc": "2025-01-31"
   }' | jq .
 ```
 

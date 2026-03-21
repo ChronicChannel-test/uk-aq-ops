@@ -63,6 +63,8 @@ Window split behavior:
 - Bucket binding: `UK_AQ_HISTORY_BUCKET`.
 - Prefix default: `history/v1/aqilevels`.
 - Reads day manifests first, then connector manifests/files under each day.
+- For the R2 segment, the worker first resolves `station_id -> connector_id` from `uk_aq_core.stations` and then reads only that connector manifest when the lookup succeeds.
+- AQI parquet reads use `station_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-station requests.
 
 ## Required GitHub env/secret targets
 
@@ -88,6 +90,9 @@ Variables:
 - `UK_AQ_AQI_HISTORY_R2_IMMUTABLE_CACHE_MAX_AGE_SECONDS=86400`
 - `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS=168` (default)
 - `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
+- `UK_AQ_AQI_HISTORY_R2_PARQUET_ROW_CHUNK_SIZE=5000` (default)
+- `UK_AQ_CORE_SCHEMA=uk_aq_core`
+- `UK_AQ_PUBLIC_SCHEMA=uk_aq_public`
 
 ## Cache proxy integration
 
@@ -103,6 +108,10 @@ Coverage metadata includes the live/fallback status for the recent window:
 
 - `coverage.obs_aqidb_status`: `not_requested`, `live`, or `history_fallback`
 - `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
+- `coverage.station_connector_id`: resolved connector for the requested station when lookup succeeds
+- `coverage.station_connector_lookup_source_path`: PostgREST source used for the station connector lookup
+- `coverage.station_connector_lookup_error`: lookup error when connector resolution fails and the worker falls back to scanning all connector manifests for the R2 segment
+- `coverage.station_connector_lookup_cache_hit`: whether the in-worker station connector cache served the lookup
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
 - top-level `cache_scope`: `recent` or `immutable`
 

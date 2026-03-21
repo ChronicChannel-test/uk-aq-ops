@@ -13,7 +13,7 @@ Full setup/runbook remains here:
 
 - `UK_AQ_BACKFILL_SERVICE_URL`
 - `UK_AQ_BACKFILL_TRIGGER_MODE` (`manual|scheduler`)
-- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aqilevels|obs_aqi_to_r2|source_to_r2`)
+- `UK_AQ_BACKFILL_RUN_MODE` (`local_to_aqilevels|obs_aqi_to_r2|source_to_r2|r2_history_obs_to_aqilevels`)
 - `UK_AQ_BACKFILL_DRY_RUN` (`true|false`)
 - `UK_AQ_BACKFILL_FORCE_REPLACE` (`true|false`)
 - `UK_AQ_BACKFILL_FROM_DAY_UTC` (`YYYY-MM-DD`)
@@ -90,6 +90,19 @@ UK_AQ_BACKFILL_STATION_ID="24665" \
 ./scripts/gcp/uk_aq_backfill_cloud_run_call.sh
 ```
 
+### 2a) AQI rebuild from committed R2 observation history
+
+```bash
+UK_AQ_BACKFILL_SERVICE_URL="${SERVICE_URL}" \
+UK_AQ_BACKFILL_TRIGGER_MODE="manual" \
+UK_AQ_BACKFILL_RUN_MODE="r2_history_obs_to_aqilevels" \
+UK_AQ_BACKFILL_DRY_RUN="false" \
+UK_AQ_BACKFILL_FORCE_REPLACE="true" \
+UK_AQ_BACKFILL_FROM_DAY_UTC="2025-01-01" \
+UK_AQ_BACKFILL_TO_DAY_UTC="2025-01-31" \
+./scripts/gcp/uk_aq_backfill_cloud_run_call.sh
+```
+
 ### 3) Use `env` explicitly
 
 ```bash
@@ -153,11 +166,11 @@ Example: all available source adapters/connectors for 2025
 
 ```bash
 export UK_AQ_BACKFILL_TRIGGER_MODE="manual"
-export UK_AQ_BACKFILL_RUN_MODE="source_to_r2"
+export UK_AQ_BACKFILL_RUN_MODE="r2_history_obs_to_aqilevels"
 export UK_AQ_BACKFILL_DRY_RUN="false"
-export UK_AQ_BACKFILL_FORCE_REPLACE="false"
+export UK_AQ_BACKFILL_FORCE_REPLACE="true"
 export UK_AQ_BACKFILL_FROM_DAY_UTC="2025-01-01"
-export UK_AQ_BACKFILL_TO_DAY_UTC="2025-12-31"
+export UK_AQ_BACKFILL_TO_DAY_UTC="2025-01-31"
 unset UK_AQ_BACKFILL_CONNECTOR_IDS
 
 ./scripts/uk_aq_backfill_local_monthly.sh
@@ -174,6 +187,7 @@ Behavior with future connectors and `UK_AQ_BACKFILL_FORCE_REPLACE=false`:
 
 - Existing backed-up connector/day outputs are skipped.
 - Newly available supported connectors are processed for missing connector/day outputs.
+- Non-dry `source_to_r2` and `r2_history_obs_to_aqilevels` monthly runs rebuild `history/_index/observations_latest.json` and `history/_index/aqilevels_latest.json` after the monthly batch completes.
 
 ## Original Example (export style)
 
