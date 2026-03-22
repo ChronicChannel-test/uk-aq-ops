@@ -63,7 +63,7 @@ Window split behavior:
 - Bucket binding: `UK_AQ_HISTORY_BUCKET`.
 - Prefix default: `history/v1/aqilevels`.
 - Reads day manifests first, then connector manifests/files under each day.
-- For the R2 segment, the worker first resolves `station_id -> connector_id` from `uk_aq_core.stations` and then reads only that connector manifest when the lookup succeeds.
+- For the R2 segment, the worker first resolves `station_id -> connector_id` from `uk_aq_public.uk_aq_station_connector_lookup` and then reads only that connector manifest when the lookup succeeds.
 - AQI parquet reads use `station_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-station requests.
 
 ## Required GitHub env/secret targets
@@ -91,7 +91,6 @@ Variables:
 - `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS=168` (default)
 - `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
 - `UK_AQ_AQI_HISTORY_R2_PARQUET_ROW_CHUNK_SIZE=5000` (default)
-- `UK_AQ_CORE_SCHEMA=uk_aq_core`
 - `UK_AQ_PUBLIC_SCHEMA=uk_aq_public`
 
 ## Cache proxy integration
