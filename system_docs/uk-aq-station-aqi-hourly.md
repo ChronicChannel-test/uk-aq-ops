@@ -1,6 +1,6 @@
 # UK AQ Station AQI Hourly Cloud Run Setup
 
-This service syncs station-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs.
+This service syncs station-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs. Helper-window reads are paginated because PostgREST caps each table-valued RPC response page at 1000 rows.
 
 ## Why reconciliation was added
 
