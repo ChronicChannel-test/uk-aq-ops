@@ -2,6 +2,8 @@
 
 This service syncs station-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs. Reconciliation modes now rebuild the ingest helper window from raw observations before reading it, and helper-window reads are paginated because PostgREST caps each table-valued RPC response page at 1000 rows.
 
+If helper rows arrive for a station ID that is still missing from Obs AQI DB mirrored `uk_aq_core.stations`, the worker skips those rows and logs the skipped station IDs and row counts instead of failing the whole AQI run.
+
 ## Why reconciliation was added
 
 Late observations frequently land after the worker's original single-hour sync window has already run, which leaves null AQI stripe gaps in station charts until a manual backfill happens. Measured lag from recent investigation showed the hourly-only window is too narrow for real production latency:
@@ -102,6 +104,9 @@ Behavior by mode:
   - first rebuild the ingest helper window from raw observations via `uk_aq_rpc_station_aqi_hourly_helper_upsert`
   - then fetch the refreshed helper rows from `uk_aq_rpc_station_aqi_hourly_helper_window`
   - page helper-window reads to avoid the PostgREST 1000-row response cap
+- before hourly upsert in every mode:
+  - filter out helper rows whose `station_id` is not yet present in Obs AQI DB mirrored station metadata
+  - log skipped station IDs and row counts so metadata lag is visible without failing the full run
 - all modes that write AQI:
   - refresh daily/monthly rollups across the actual recomputed window and affected stations
   - log `run_mode`, `window_start_utc`, and `window_end_utc` into `uk_aq_ops.aqi_compute_runs` within `obs_aqidb`
