@@ -27,6 +27,7 @@ Mirrored derived index files:
 
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
+- `history/_index/observations_timeseries_latest.json`
 
 Checkpoint path (default):
 

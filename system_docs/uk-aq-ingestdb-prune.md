@@ -28,9 +28,11 @@ Bucket key is:
 - Phase B writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.history_candidates`
   - `uk_aq_ops.prune_day_gates.history_done`
-- After a successful non-dry Phase B history export, the service rebuilds derived R2 index manifests from committed day manifests:
+- After a successful non-dry Phase B history export, the service rebuilds derived R2 index manifests from committed day manifests and connector manifests:
   - `history/_index/observations_latest.json`
   - `history/_index/aqilevels_latest.json`
+  - `history/_index/observations_timeseries_latest.json`
+  - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 - Index rebuild is best-effort:
   - failures are logged as `phase_b_history_index_rebuild_failed`
   - prune compare/delete work continues, so core prune safety is not blocked by index refresh drift
@@ -170,10 +172,11 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
+- `UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX` (default `history/_index/observations_timeseries`)
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
 
 Website observation API note:
-- `uk_aq_timeseries` now uses ingestdb for the freshest `24` hours, `obs_aqidb` for the next `13` days inside the local `14`-day window, and R2 for older history. Keep `obs_aqidb` retention at `14` days or more if the website should continue to serve that full local recent window, and keep ingestdb available for the freshest local slice.
+- `uk_aq_timeseries` now uses ingestdb for the freshest `24` hours (`UK_AQ_TIMESERIES_INGEST_SOURCE_OF_TRUTH_HOURS`), `obs_aqidb` for the next `6` days in the local `7`-day window (`UK_AQ_TIMESERIES_OBSAQIDB_SOURCE_OF_TRUTH_HOURS`, default `168`), and R2 for older history.
 
 Phase B required env/secrets:
 

@@ -173,7 +173,9 @@ Shared behavior:
     rebuilds the derived R2 history index manifests:
     - `history/_index/observations_latest.json`
     - `history/_index/aqilevels_latest.json`
-  - rebuild is done from committed day manifests only, via `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
+    - `history/_index/observations_timeseries_latest.json`
+    - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+  - rebuild is done from committed day manifests and connector manifests only, via `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
   - per-month log files include the wrapper run start time and connector filter:
     - `<run_mode>_<run_started_at_utc>_<connector_ids_or_all>_<month_from>_to_<month_to>.log`
     - `run_started_at_utc` format: `YYYY-MM-DD_HH-MM-SS`

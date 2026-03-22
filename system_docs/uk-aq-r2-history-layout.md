@@ -33,6 +33,11 @@ history/
   _index/
     observations_latest.json
     aqilevels_latest.json
+    observations_timeseries_latest.json
+    observations_timeseries/
+      day_utc=YYYY-MM-DD/
+        connector_id=<id>/
+          manifest.json
   v1/
     observations/
       day_utc=YYYY-MM-DD/
@@ -100,6 +105,11 @@ Connector manifest fields:
   - `file_count`
   - `total_bytes`
   - `files`
+    - each observations `files[]` entry may also include:
+      - `min_timeseries_id`
+      - `max_timeseries_id`
+      - `min_observed_at`
+      - `max_observed_at`
 - schema metadata:
   - `history_schema_name`
   - `history_schema_version`
@@ -199,8 +209,10 @@ Derived index objects live under:
 
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
+- `history/_index/observations_timeseries_latest.json`
+- `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 
-These are rebuilt from committed day manifests only.
+These are rebuilt from committed day manifests and connector manifests only.
 
 Index payload fields:
 
@@ -246,6 +258,73 @@ Each `connectors` entry includes:
 - `file_count`
 - `total_bytes`
 - `manifest_key`
+
+### Observations timeseries index (lightweight file-range index)
+
+This index family accelerates historical reads for one `timeseries_id` by narrowing
+which parquet files are scanned for each `day_utc + connector_id`.
+
+Latest descriptor key:
+
+- `history/_index/observations_timeseries_latest.json`
+
+Per-day per-connector index key:
+
+- `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+
+`observations_timeseries_latest.json` fields:
+
+- `schema_version`
+- `generated_at`
+- `source` (`r2_connector_manifests`)
+- `domain` (`observations`)
+- `index_kind` (`timeseries_file_ranges`)
+- `bucket`
+- `observations_prefix`
+- `index_prefix`
+- `min_day_utc`
+- `max_day_utc`
+- `day_count`
+- `connector_index_count`
+- `file_count`
+- `indexed_file_count`
+- `days`
+- `key_layout.connector_index_manifest_key_template`
+- `key_layout.latest_key`
+- `day_summaries[]` with:
+  - `day_utc`
+  - `connector_count`
+  - `connector_ids`
+
+Per-connector index manifest fields:
+
+- `schema_version`
+- `generated_at`
+- `source` (`r2_connector_manifest`)
+- `domain` (`observations`)
+- `index_kind` (`timeseries_file_ranges`)
+- `bucket`
+- `observations_prefix`
+- `day_utc`
+- `connector_id`
+- `connector_manifest_key`
+- `connector_manifest_hash`
+- `source_row_count`
+- `file_count`
+- `indexed_file_count`
+- `index_coverage` (`complete|partial`)
+- `min_timeseries_id`
+- `max_timeseries_id`
+- `files[]`, each with:
+  - `key`
+  - `row_count`
+  - `bytes`
+  - `etag_or_hash`
+  - `min_timeseries_id`
+  - `max_timeseries_id`
+  - `min_observed_at`
+  - `max_observed_at`
+- `backed_up_at_utc`
 
 ## Core Snapshot Objects
 

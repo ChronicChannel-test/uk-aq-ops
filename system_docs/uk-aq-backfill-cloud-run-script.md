@@ -187,7 +187,12 @@ Behavior with future connectors and `UK_AQ_BACKFILL_FORCE_REPLACE=false`:
 
 - Existing backed-up connector/day outputs are skipped.
 - Newly available supported connectors are processed for missing connector/day outputs.
-- Non-dry `source_to_r2` and `r2_history_obs_to_aqilevels` monthly runs rebuild `history/_index/observations_latest.json` and `history/_index/aqilevels_latest.json` after the monthly batch completes.
+- Non-dry `source_to_r2` and `r2_history_obs_to_aqilevels` monthly runs rebuild:
+  - `history/_index/observations_latest.json`
+  - `history/_index/aqilevels_latest.json`
+  - `history/_index/observations_timeseries_latest.json`
+  - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+  after the monthly batch completes.
 
 ## Original Example (export style)
 

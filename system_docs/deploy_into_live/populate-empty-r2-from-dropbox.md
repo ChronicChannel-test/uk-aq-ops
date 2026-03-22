@@ -46,6 +46,7 @@ The Dropbox backup includes the derived index files:
 
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
+- `history/_index/observations_timeseries_latest.json`
 
 The restore script does not restore those files. That is good for cross-environment use, because the derived index payload includes environment-specific metadata such as the R2 bucket name.
 
@@ -131,6 +132,8 @@ This writes the live:
 
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
+- `history/_index/observations_timeseries_latest.json`
+- `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 
 ## Validation Checklist
 
@@ -142,6 +145,8 @@ After the restore:
 - Confirm the index rebuild wrote:
   - `history/_index/observations_latest.json`
   - `history/_index/aqilevels_latest.json`
+  - `history/_index/observations_timeseries_latest.json`
+  - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 - Confirm the live core DB still has the expected source/test IDs.
 - Spot-check a few known `timeseries_id` and `station_id` queries against the live history readers.
 
