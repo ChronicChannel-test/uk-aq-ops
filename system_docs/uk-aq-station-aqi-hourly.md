@@ -1,6 +1,6 @@
 # UK AQ Station AQI Hourly Cloud Run Setup
 
-This service syncs station-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs. Helper-window reads are paginated because PostgREST caps each table-valued RPC response page at 1000 rows.
+This service syncs station-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs. Reconciliation modes now rebuild the ingest helper window from raw observations before reading it, and helper-window reads are paginated because PostgREST caps each table-valued RPC response page at 1000 rows.
 
 ## Why reconciliation was added
 
@@ -93,14 +93,20 @@ Defaults:
 - `UK_AQ_AQI_RECONCILE_SHORT_HOURS=8`
 - `UK_AQ_AQI_RECONCILE_DEEP_HOURS=36`
 
-Behavior for all non-backfill modes:
+Behavior by mode:
 
-- reuse ingest RPC `uk_aq_rpc_station_aqi_hourly_helper_window` for the computed hour window
-- reuse `uk_aq_rpc_station_aqi_hourly_upsert` with the existing chunking and retry behavior
-- refresh daily/monthly rollups across the actual recomputed window and affected stations
-- log `run_mode`, `window_start_utc`, and `window_end_utc` into `uk_aq_ops.aqi_compute_runs` within `obs_aqidb`
+- `sync_hourly`:
+  - read the existing ingest helper window via `uk_aq_rpc_station_aqi_hourly_helper_window`
+  - reuse `uk_aq_rpc_station_aqi_hourly_upsert` with the existing chunking and retry behavior
+- `reconcile_short` and `reconcile_deep`:
+  - first rebuild the ingest helper window from raw observations via `uk_aq_rpc_station_aqi_hourly_helper_upsert`
+  - then fetch the refreshed helper rows from `uk_aq_rpc_station_aqi_hourly_helper_window`
+  - page helper-window reads to avoid the PostgREST 1000-row response cap
+- all modes that write AQI:
+  - refresh daily/monthly rollups across the actual recomputed window and affected stations
+  - log `run_mode`, `window_start_utc`, and `window_end_utc` into `uk_aq_ops.aqi_compute_runs` within `obs_aqidb`
 
-`UK_AQ_AQI_STATION_IDS_CSV` still scopes helper fetches and rollup refreshes for manual targeted runs, including targeted backfill or reconciliation.
+`UK_AQ_AQI_STATION_IDS_CSV` still scopes helper rebuilds, helper fetches, and rollup refreshes for manual targeted runs, including targeted backfill or reconciliation.
 
 ## Manual Run
 
