@@ -64,6 +64,11 @@ Window split behavior:
 - Prefix default: `history/v1/aqilevels`.
 - Reads day manifests first, then connector manifests/files under each day.
 - For the R2 segment, the worker first resolves `station_id -> connector_id` from `uk_aq_public.uk_aq_station_connector_lookup` and then reads only that connector manifest when the lookup succeeds.
+- Optional AQI timeseries index fast-path:
+  - prefix default: `history/_index/aqilevels_timeseries`
+  - index key shape: `day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+  - worker resolves station timeseries ids from `uk_aq_core.timeseries` and narrows parquet scans by `min_timeseries_id/max_timeseries_id`.
+  - missing/invalid index entries fall back to connector manifest scanning.
 - AQI parquet reads use `station_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-station requests.
 
 ## Required GitHub env/secret targets
@@ -86,12 +91,16 @@ Variables:
 ## Runtime vars (wrangler defaults)
 
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX=history/v1/aqilevels`
+- `UK_AQ_R2_HISTORY_INDEX_PREFIX=history/_index`
+- `UK_AQ_AQI_HISTORY_R2_TIMESERIES_INDEX_PREFIX=history/_index/aqilevels_timeseries`
+- `UK_AQ_AQI_HISTORY_R2_TIMESERIES_INDEX_ENABLED=true`
 - `UK_AQ_AQI_HISTORY_R2_CACHE_MAX_AGE_SECONDS=300`
 - `UK_AQ_AQI_HISTORY_R2_IMMUTABLE_CACHE_MAX_AGE_SECONDS=86400`
 - `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS=168` (default)
 - `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
 - `UK_AQ_AQI_HISTORY_R2_PARQUET_ROW_CHUNK_SIZE=5000` (default)
 - `UK_AQ_PUBLIC_SCHEMA=uk_aq_public`
+- `UK_AQ_CORE_SCHEMA=uk_aq_core`
 
 ## Cache proxy integration
 
@@ -111,7 +120,13 @@ Coverage metadata includes the live/fallback status for the recent window:
 - `coverage.station_connector_lookup_source_path`: PostgREST source used for the station connector lookup
 - `coverage.station_connector_lookup_error`: lookup error when connector resolution fails and the worker falls back to scanning all connector manifests for the R2 segment
 - `coverage.station_connector_lookup_cache_hit`: whether the in-worker station connector cache served the lookup
+- `coverage.station_timeseries_lookup_source_path`: PostgREST source used for the station timeseries lookup
+- `coverage.station_timeseries_lookup_error`: lookup error when station timeseries resolution fails and index filtering falls back to full connector manifest scans
+- `coverage.station_timeseries_lookup_cache_hit`: whether the in-worker station timeseries cache served the lookup
+- `coverage.station_timeseries_id_count`: number of station timeseries ids used for AQI index filtering
+- `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, and warnings)
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
+- `coverage.r2_recent_fallback_timeseries_index`: AQI index diagnostics for the recent fallback segment
 - top-level `cache_scope`: `recent` or `immutable`
 
 ## Point payload
