@@ -28,7 +28,9 @@ Mirrored derived index files:
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
 - `history/_index/observations_timeseries_latest.json`
+- `history/_index/aqilevels_timeseries_latest.json`
 - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+- `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 
 Checkpoint path (default):
 
@@ -53,8 +55,9 @@ The script:
 5. Verifies copied manifest hash at destination.
 6. Updates checkpoint state after each successful day.
 7. Compares derived `history/_index/*_latest.json` manifest hashes and copies changed files into Dropbox after the day-folder sync completes.
-8. Mirrors the full observations-timeseries index subtree:
-   `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`.
+8. Mirrors the full timeseries index subtrees:
+   - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+   - `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`.
 
 ## Workflow
 
