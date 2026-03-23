@@ -124,7 +124,7 @@ Coverage metadata includes the live/fallback status for the recent window:
 - `coverage.station_timeseries_lookup_error`: lookup error when station timeseries resolution fails and index filtering falls back to full connector manifest scans
 - `coverage.station_timeseries_lookup_cache_hit`: whether the in-worker station timeseries cache served the lookup
 - `coverage.station_timeseries_id_count`: number of station timeseries ids used for AQI index filtering
-- `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, and warnings)
+- `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, `skipped_files_by_pollutant`, and warnings)
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
 - `coverage.r2_recent_fallback_timeseries_index`: AQI index diagnostics for the recent fallback segment
 - top-level `cache_scope`: `recent` or `immutable`
@@ -147,3 +147,8 @@ Each `points[]` row includes:
   - `eaqi_pm10_index_level`
 
 When `pollutant` is omitted, the generic pair remains the max-across-supported-pollutants summary for backward compatibility. New chart clients should read the pollutant-specific fields directly.
+
+Implementation note:
+
+- R2 parquet reads are now based on normalized AQI rows (`pollutant_code`, `daqi_index_level`, `eaqi_index_level`).
+- Pollutant-specific response fields remain available and are derived/aggregated at read time for compatibility.

@@ -172,26 +172,19 @@ Committed AQI objects live under:
 Current AQI parquet schema:
 
 - `history_schema_name`: `aqilevels`
-- `history_schema_version`: `1`
-- `writer_version`: `parquet-wasm-zstd-v1`
+- `history_schema_version`: `2`
+- `writer_version`: `parquet-wasm-zstd-v2`
 - columns:
   - `connector_id`
+  - `timeseries_id`
   - `station_id`
+  - `pollutant_code`
   - `timestamp_hour_utc`
-  - `no2_hourly_mean_ugm3`
-  - `pm25_hourly_mean_ugm3`
-  - `pm10_hourly_mean_ugm3`
-  - `pm25_rolling24h_mean_ugm3`
-  - `pm10_rolling24h_mean_ugm3`
-  - `no2_hourly_sample_count`
-  - `pm25_hourly_sample_count`
-  - `pm10_hourly_sample_count`
-  - `daqi_no2_index_level`
-  - `daqi_pm25_rolling24h_index_level`
-  - `daqi_pm10_rolling24h_index_level`
-  - `eaqi_no2_index_level`
-  - `eaqi_pm25_index_level`
-  - `eaqi_pm10_index_level`
+  - `hourly_mean_ugm3`
+  - `rolling24h_mean_ugm3`
+  - `hourly_sample_count`
+  - `daqi_index_level`
+  - `eaqi_index_level`
 
 AQI connector/day manifests follow the same overall pattern as observations, but use:
 
@@ -211,6 +204,8 @@ Derived index objects live under:
 - `history/_index/aqilevels_latest.json`
 - `history/_index/observations_timeseries_latest.json`
 - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+- `history/_index/aqilevels_timeseries_latest.json`
+- `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 
 These are rebuilt from committed day manifests and connector manifests only.
 
@@ -324,6 +319,52 @@ Per-connector index manifest fields:
   - `max_timeseries_id`
   - `min_observed_at`
   - `max_observed_at`
+- `backed_up_at_utc`
+
+### AQI timeseries index (lightweight file-range index)
+
+This index family accelerates AQI history reads by narrowing parquet scans for
+`day_utc + connector_id`, then pruning by timeseries-id range and optional
+pollutant availability.
+
+Latest descriptor key:
+
+- `history/_index/aqilevels_timeseries_latest.json`
+
+Per-day per-connector index key:
+
+- `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+
+Per-connector AQI index manifest fields:
+
+- `schema_version`
+- `generated_at`
+- `source` (`r2_connector_manifest`)
+- `domain` (`aqilevels`)
+- `index_kind` (`timeseries_file_ranges`)
+- `bucket`
+- `aqilevels_prefix`
+- `day_utc`
+- `connector_id`
+- `connector_manifest_key`
+- `connector_manifest_hash`
+- `source_row_count`
+- `file_count`
+- `indexed_file_count`
+- `index_coverage` (`complete|partial`)
+- `available_pollutants`
+- `min_timeseries_id`
+- `max_timeseries_id`
+- `files[]`, each with:
+  - `key`
+  - `row_count`
+  - `bytes`
+  - `etag_or_hash`
+  - `pollutant_codes`
+  - `min_timeseries_id`
+  - `max_timeseries_id`
+  - `min_timestamp_hour_utc`
+  - `max_timestamp_hour_utc`
 - `backed_up_at_utc`
 
 ## Core Snapshot Objects

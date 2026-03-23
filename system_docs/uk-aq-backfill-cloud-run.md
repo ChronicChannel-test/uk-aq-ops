@@ -53,6 +53,8 @@ Main flow:
    - optional R2 fallback only when enabled.
 5. Fetch source hourly rows and normalize helper shape.
    - R2 fallback reads committed `history/v1/observations/...` parquet for the target day plus the previous UTC day needed for the rolling 24-hour AQI lookback window, then rebuilds hourly source rows before AQI upsert.
+   - source lookup is metadata-first from `stations`, `timeseries`, `phenomena`, and `observed_properties`; legacy `timeseries_ref` parsing is fallback-only.
+   - numeric `timeseries_ref` values are supported through metadata lookup (no `station_ref:pollutant` requirement).
 6. Upsert hourly AQI rows and refresh daily/monthly rollups.
    - retryable hourly write timeouts split the affected AQI upsert batch into smaller sub-batches automatically before the connector/day is marked failed.
 7. Write structured logs and optional ledger/checkpoints.
@@ -89,6 +91,7 @@ Implemented as a real export/write path.
   - day manifest under:
     - `history/v1/observations/day_utc=.../manifest.json`
     - `history/v1/aqilevels/day_utc=.../manifest.json`
+- AQI parquet export uses normalized hourly rows (`pollutant_code`, `hourly_mean_ugm3`, `rolling24h_mean_ugm3`, `daqi_index_level`, `eaqi_index_level`); AQI connector manifest file entries also carry `pollutant_codes` to support lightweight AQI index pruning.
 - transient R2 request failures during upload/verification are retried automatically with bounded backoff before a connector/day is marked failed.
 - Honors `force_replace=true` by re-exporting selected connector/day payloads.
 - Safety guards for partial-day prevention:
