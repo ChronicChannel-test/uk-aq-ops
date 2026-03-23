@@ -22,8 +22,6 @@ Full setup/runbook remains here:
 ## Optional env vars
 
 - `UK_AQ_BACKFILL_CONNECTOR_IDS` (example `4,7`)
-- `UK_AQ_BACKFILL_STATION_IDS` (example `24665` or `24665,24666`)
-- `UK_AQ_BACKFILL_STATION_ID` (single-id alias)
 - `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK` (`true|false`, default `false`)
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`; used for R2 core metadata lookup)
 - `UK_AQ_BACKFILL_R2_CORE_LOOKBACK_DAYS` (default `45`)
@@ -76,7 +74,7 @@ UK_AQ_BACKFILL_CONNECTOR_IDS="4" \
 ./scripts/gcp/uk_aq_backfill_cloud_run_call.sh
 ```
 
-### 2) Station-targeted run (`source_to_r2`)
+### 2) Connector-targeted run (`source_to_r2`)
 
 ```bash
 UK_AQ_BACKFILL_SERVICE_URL="${SERVICE_URL}" \
@@ -86,7 +84,7 @@ UK_AQ_BACKFILL_DRY_RUN="false" \
 UK_AQ_BACKFILL_FORCE_REPLACE="true" \
 UK_AQ_BACKFILL_FROM_DAY_UTC="2026-02-11" \
 UK_AQ_BACKFILL_TO_DAY_UTC="2026-02-15" \
-UK_AQ_BACKFILL_STATION_ID="24665" \
+UK_AQ_BACKFILL_CONNECTOR_IDS="4" \
 ./scripts/gcp/uk_aq_backfill_cloud_run_call.sh
 ```
 
@@ -143,8 +141,7 @@ UK_AQ_BACKFILL_FORCE_REPLACE="true" \
 ## Notes
 
 - Use actual values, not placeholders like `true|false`.
-- `UK_AQ_BACKFILL_FROM_DAY_UTC`, `UK_AQ_BACKFILL_TO_DAY_UTC`, `UK_AQ_BACKFILL_CONNECTOR_IDS`, and `UK_AQ_BACKFILL_STATION_IDS` can all be passed inline in the command (examples above).
-- When `UK_AQ_BACKFILL_STATION_ID(S)` is supplied, the worker resolves `connector_id` + `station_ref` from ingest metadata and scopes backfill to those stations.
+- `UK_AQ_BACKFILL_FROM_DAY_UTC`, `UK_AQ_BACKFILL_TO_DAY_UTC`, and `UK_AQ_BACKFILL_CONNECTOR_IDS` can all be passed inline in the command (examples above).
 - All listed parameters can be passed in-command the same way.
 
 ## Local Monthly Wrapper (No Cloud Run)

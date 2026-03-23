@@ -8,7 +8,7 @@ Deploy workflow: `.github/workflows/uk_aq_aqi_history_r2_api_worker_deploy.yml`
 
 Cloudflare Worker for station AQI history reads, stitched from:
 
-- recent window from `obs_aqidb` (`uk_aq_public.uk_aq_station_aqi_hourly`), and
+- recent window from `obs_aqidb` (`uk_aq_public.uk_aq_timeseries_aqi_hourly`), and
 - older window from R2 backups (`history/v1/aqilevels`).
 
 This is intended for website DAQI/EAQI charts where recent AQI is not yet exported to R2.

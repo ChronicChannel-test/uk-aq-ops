@@ -10,8 +10,8 @@ This deploys a dedicated Cloud Run service that enforces rolling retention for `
 - check committed R2 History manifest before each drop:
   - HEAD `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
 - delete only confirmed complete days from:
-  - `uk_aq_aqilevels.station_aqi_hourly`
-  - `uk_aq_aqilevels.station_aqi_daily`
+  - `uk_aq_aqilevels.timeseries_aqi_hourly`
+  - `uk_aq_aqilevels.timeseries_aqi_daily`
 - after a successful delete, best-effort remove the matching current day-count row via `uk_aq_rpc_obs_aqidb_day_count_delete('aqilevels', day_utc)`
   - failures are logged as warnings only because hourly/daily day-count refresh jobs will reconcile later
 

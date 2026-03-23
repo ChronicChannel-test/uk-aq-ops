@@ -80,7 +80,7 @@ Implemented as a real export/write path.
 - Reads source rows from `obs_aqidb` (`uk_aq_observs.observations`) via:
   - `uk_aq_public.uk_aq_rpc_observs_history_day_rows` when available, else
   - direct table fallback query.
-- Reads AQI rows from `obs_aqidb` (`uk_aq_aqilevels.station_aqi_hourly`) via:
+- Reads AQI rows from `obs_aqidb` (`uk_aq_aqilevels.timeseries_aqi_hourly`) via:
   - `uk_aq_public.uk_aq_rpc_aqilevels_history_day_connector_counts`
   - `uk_aq_public.uk_aq_rpc_aqilevels_history_day_rows`
 - Writes in both domains:
@@ -183,11 +183,6 @@ Shared behavior:
     - `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS`
     - `0` or unset means no pause
     - legacy alias: `UK_AQ_BACKFILL_MONTHLY_PAUSE_SECONDS`
-- Station-targeted scope:
-  - accept `station_id` / `station_ids`,
-  - resolve `connector_id` + `station_ref` from ingest `uk_aq_core.stations`,
-  - apply that scope across Sensor.Community and OpenAQ source backfill paths.
-
 Status behavior:
 
 - `dry_run=true`: `dry_run`.
@@ -270,7 +265,7 @@ Core:
 - `UK_AQ_BACKFILL_FROM_DAY_UTC=YYYY-MM-DD`
 - `UK_AQ_BACKFILL_TO_DAY_UTC=YYYY-MM-DD`
 - `UK_AQ_BACKFILL_CONNECTOR_IDS=4,7,11`
-- `UK_AQ_BACKFILL_STATION_IDS=24665,24666` (or `UK_AQ_BACKFILL_STATION_ID=24665`)
+- `UK_AQ_BACKFILL_TIMESERIES_IDS=12345,12346` (or `UK_AQ_BACKFILL_TIMESERIES_ID=12345`)
 - `UK_AQ_BACKFILL_ENABLE_R2_FALLBACK=true|false`
 - `UK_AQ_BACKFILL_ALLOW_STUB_MODES=true|false` (default `false`)
 
@@ -285,7 +280,7 @@ RPC tuning:
 - `UK_AQ_BACKFILL_RPC_RETRIES` (default `3`)
 - `UK_AQ_BACKFILL_HOURLY_UPSERT_CHUNK_SIZE` (default `2000`)
 - `UK_AQ_BACKFILL_HOURLY_UPSERT_MIN_CHUNK_SIZE` (default `250`; timeout retry floor for split hourly AQI upsert batches)
-- `UK_AQ_BACKFILL_STATION_ID_PAGE_SIZE` (default `1000`)
+- `UK_AQ_BACKFILL_TIMESERIES_ID_PAGE_SIZE` (default `1000`)
 - `UK_AQ_BACKFILL_SOURCE_RPC_PAGE_SIZE` (default `1000`)
 - `UK_AQ_BACKFILL_SOURCE_RPC_MAX_PAGES` (default `200`)
 - `UK_AQ_BACKFILL_OBS_R2_PAGE_SIZE` (default `20000`)
@@ -492,7 +487,7 @@ curl -sS -X POST "${SERVICE_URL}/run" \
     "force_replace": true,
     "from_day_utc": "2026-02-11",
     "to_day_utc": "2026-02-15",
-    "station_ids": [24665]
+    "connector_ids": [7]
   }' | jq .
 ```
 
