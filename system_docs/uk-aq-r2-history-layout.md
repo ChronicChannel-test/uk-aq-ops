@@ -447,6 +447,8 @@ Examples:
 
 - prune day gating updates `uk_aq_ops.prune_day_gates.history_done` from committed day manifests
 - R2 API workers read day manifests first, then connector manifests and parquet files
+- observs R2 API cache keys are canonicalized to `/v1/observations` with normalized query params (`timeseries_id`, `connector_id`, `start_utc`, `end_utc`, optional `since_utc`, optional `limit`)
+- observs R2 API responses use dynamic cache TTL (`recent` vs `immutable`) based on `end_utc` and expose that via `cache_scope`
 - Dropbox backup mirrors committed day folders and derived index files exactly
 
 ## Non-Goals
