@@ -257,7 +257,8 @@ Each `connectors` entry includes:
 ### Observations timeseries index (lightweight file-range index)
 
 This index family accelerates historical reads for one `timeseries_id` by narrowing
-which parquet files are scanned for each `day_utc + connector_id`.
+which parquet files are scanned for each `day_utc + connector_id`, using file
+`min_timeseries_id/max_timeseries_id` and (when present) `min_observed_at/max_observed_at`.
 
 Latest descriptor key:
 
