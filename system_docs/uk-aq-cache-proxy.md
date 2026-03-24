@@ -32,6 +32,13 @@ Read endpoints:
   - cache policy is dynamic by requested end time:
     - requests ending within the last 24 hours use the short realtime profile
     - requests ending more than 24 hours ago use a long immutable-history profile
+  - long-range request canonicalization:
+    - for ranges >= 72 hours, `from_utc/start_utc` and `to_utc/end_utc` are rounded down to the hour before cache lookup/upstream fetch
+    - this reduces cache-key churn from second-level timestamp differences on hourly AQI charts
+  - upstream retry policy:
+    - general read routes: up to 2 attempts
+    - AQI history route: up to 6 attempts with linear backoff
+    - retry statuses: `502`, `503`, `504`
 
 ## Required GitHub env/secret targets
 
@@ -76,3 +83,4 @@ Worker naming:
 - Keep test/prod hostnames and origin allowlists separated by environment.
 - Upstream edge functions must validate `X-UK-AQ-Upstream-Auth` with the same `UK_AQ_EDGE_UPSTREAM_SECRET`.
 - Same-origin browser requests are accepted even when `Origin` is omitted (fallback uses `Sec-Fetch-Site: same-origin` or same-origin `Referer`).
+- Response diagnostics include `X-UK-AQ-Upstream-Attempts` and (when retries were used) `X-UK-AQ-Upstream-Retry`.
