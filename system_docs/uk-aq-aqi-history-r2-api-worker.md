@@ -67,7 +67,7 @@ Window split behavior:
 - Optional AQI timeseries index fast-path:
   - prefix default: `history/_index/aqilevels_timeseries`
   - index key shape: `day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
-  - worker resolves station timeseries ids from `uk_aq_core.timeseries` and narrows parquet scans by `min_timeseries_id/max_timeseries_id`.
+  - worker resolves station timeseries ids from `uk_aq_public.uk_aq_timeseries_aqi_hourly` within the requested window and narrows parquet scans by `min_timeseries_id/max_timeseries_id`.
   - missing/invalid index entries fall back to connector manifest scanning.
 - AQI parquet reads use `station_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-station requests.
 
@@ -100,7 +100,6 @@ Variables:
 - `UK_AQ_AQI_HISTORY_OBSAQIDB_TIMEOUT_MS=10000` (default)
 - `UK_AQ_AQI_HISTORY_R2_PARQUET_ROW_CHUNK_SIZE=5000` (default)
 - `UK_AQ_PUBLIC_SCHEMA=uk_aq_public`
-- `UK_AQ_CORE_SCHEMA=uk_aq_core`
 
 ## Cache proxy integration
 
