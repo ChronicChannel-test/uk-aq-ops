@@ -6,7 +6,7 @@ Deploy workflow: `.github/workflows/uk_aq_aqi_history_r2_api_worker_deploy.yml`
 
 ## Purpose
 
-Cloudflare Worker for station AQI history reads, stitched from:
+Cloudflare Worker for timeseries AQI history reads, stitched from:
 
 - recent window from `obs_aqidb` (`uk_aq_public.uk_aq_timeseries_aqi_hourly`), and
 - older window from R2 backups (`history/v1/aqilevels`).
@@ -22,12 +22,12 @@ This is intended for website DAQI/EAQI charts where recent AQI is not yet export
 
 Required:
 
-- `station_id` (positive integer)
+- `timeseries_id` (positive integer)
   - aliases accepted: `entity`, `entity_id`
 
 Optional:
 
-- `scope` (must be `station`; default `station`)
+- `scope` (must be `timeseries`; default `timeseries`)
 - `grain` (must be `hourly`; default `hourly`)
 - time range:
   - `from_utc` + `to_utc` (ISO timestamps)
@@ -63,14 +63,15 @@ Window split behavior:
 - Bucket binding: `UK_AQ_HISTORY_BUCKET`.
 - Prefix default: `history/v1/aqilevels`.
 - Reads day manifests first, then connector manifests/files under each day.
-- For the R2 segment, the worker first resolves `station_id -> connector_id` from `uk_aq_public.uk_aq_station_connector_lookup` and then reads only that connector manifest when the lookup succeeds.
+- For the R2 segment, the worker resolves timeseries window context from `uk_aq_public.uk_aq_timeseries_aqi_hourly` (connector id, station id, and window timeseries ids) and narrows scans accordingly.
 - Optional AQI timeseries index fast-path:
   - prefix default: `history/_index/aqilevels_timeseries`
   - index key shape: `day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
-  - worker resolves station timeseries ids from `uk_aq_public.uk_aq_timeseries_aqi_hourly` within the requested window and narrows parquet scans by `min_timeseries_id/max_timeseries_id`.
-  - if the resolved station timeseries id list is explicitly empty for the requested window, the worker now fast-returns an empty history segment and skips R2 parquet scans to avoid CPU-limit failures on stations with no AQI coverage.
+  - worker resolves window timeseries ids from `uk_aq_public.uk_aq_timeseries_aqi_hourly` and narrows parquet scans by `min_timeseries_id/max_timeseries_id`.
+  - if the resolved window timeseries id list is explicitly empty for the requested window, the worker fast-returns an empty history segment and skips R2 parquet scans to avoid CPU-limit failures.
   - missing/invalid index entries fall back to connector manifest scanning.
-- AQI parquet reads use `station_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-station requests.
+- AQI parquet reads use `timeseries_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-timeseries requests.
+- Day-level R2 scans are processed newest-first so when scan budgets are hit, recent overlap near the live split is prioritized over older history.
 
 ## Required GitHub env/secret targets
 
@@ -116,17 +117,18 @@ Coverage metadata includes the live/fallback status for the recent window:
 
 - `coverage.obs_aqidb_status`: `not_requested`, `live`, or `history_fallback`
 - `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
-- `coverage.station_connector_id`: resolved connector for the requested station when lookup succeeds
-- `coverage.station_connector_lookup_source_path`: PostgREST source used for the station connector lookup
-- `coverage.station_connector_lookup_error`: lookup error when connector resolution fails and the worker falls back to scanning all connector manifests for the R2 segment
-- `coverage.station_connector_lookup_cache_hit`: whether the in-worker station connector cache served the lookup
-- `coverage.station_timeseries_lookup_source_path`: PostgREST source used for the station timeseries lookup
-- `coverage.station_timeseries_lookup_error`: lookup error when station timeseries resolution fails and index filtering falls back to full connector manifest scans
-- `coverage.station_timeseries_lookup_cache_hit`: whether the in-worker station timeseries cache served the lookup
-- `coverage.station_timeseries_id_count`: number of station timeseries ids used for AQI index filtering
+- `coverage.target_connector_id`: resolved connector id for the requested timeseries window context when lookup succeeds
+- `coverage.target_station_id`: resolved station id for the requested timeseries window context (metadata only; parquet filtering is timeseries-based)
+- `coverage.timeseries_window_context_lookup_source_path`: PostgREST source used for timeseries window context lookup
+- `coverage.timeseries_window_context_lookup_error`: lookup error when window-context resolution fails and index filtering falls back to minimal timeseries-only context
+- `coverage.timeseries_window_context_lookup_cache_hit`: whether the in-worker window-context cache served the lookup
+- `coverage.target_timeseries_id_count`: number of timeseries ids used for AQI index filtering
+- `coverage.history_scan_complete` / `coverage.history_scan_stopped_reason`: whether the main R2 history scan completed without budget cut-off
 - `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, `skipped_files_by_pollutant`, and warnings)
 - `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
+- `coverage.r2_recent_fallback_scan_complete` / `coverage.r2_recent_fallback_scan_stopped_reason`: whether recent fallback R2 scan completed when fallback was used
 - `coverage.r2_recent_fallback_timeseries_index`: AQI index diagnostics for the recent fallback segment
+- top-level `response_complete`: `true` when required R2 scans were not cut short by scan budgets
 - top-level `cache_scope`: `recent` or `immutable`
 
 ## Point payload
@@ -134,6 +136,7 @@ Coverage metadata includes the live/fallback status for the recent window:
 Each `points[]` row includes:
 
 - `period_start_utc`
+- `timeseries_id`
 - `station_id`
 - generic AQI fields:
   - `daqi_index_level`

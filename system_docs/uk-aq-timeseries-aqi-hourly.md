@@ -56,6 +56,7 @@ In ingest DB, `pg_cron` runs helper computation hourly at `:10`:
   - use `> start AND <= end` hour-end windowing
 
 This writes `uk_aq_aqilevels.timeseries_aqi_hourly_helper` in ingest DB.
+Helper cleanup runs in the same ingest tick via `uk_aq_rpc_timeseries_aqi_hourly_helper_cleanup` with default retention `21` days unless explicitly overridden.
 
 ## Cloud Scheduler Trigger
 
