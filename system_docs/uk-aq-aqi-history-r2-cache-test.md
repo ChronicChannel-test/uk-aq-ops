@@ -2,6 +2,12 @@
 
 This is a test harness to measure browser fetch performance for AQI history served from Cloudflare R2 through a Cloudflare Worker cache layer.
 
+Status:
+
+- archived on 2026-03-25
+- archived worker snapshot path:
+  - `archive/2026-03-25_aqi_history_r2_test_worker_retired/uk_aq_aqi_history_r2_test_worker/`
+
 ## What Was Added
 
 Ops repo:
@@ -9,10 +15,8 @@ Ops repo:
 - Seed script:
   - `scripts/backup_r2/uk_aq_aqi_history_r2_test_seed.mjs`
 - Worker:
-  - `workers/uk_aq_aqi_history_r2_test_worker/worker.mjs`
-  - `workers/uk_aq_aqi_history_r2_test_worker/wrangler.toml`
-- Deploy workflow:
-  - `.github/workflows/uk_aq_aqi_history_r2_test_worker_deploy.yml`
+  - `archive/2026-03-25_aqi_history_r2_test_worker_retired/uk_aq_aqi_history_r2_test_worker/worker.mjs`
+  - `archive/2026-03-25_aqi_history_r2_test_worker_retired/uk_aq_aqi_history_r2_test_worker/wrangler.toml`
 
 Website repo:
 
@@ -88,18 +92,14 @@ node scripts/backup_r2/uk_aq_aqi_history_r2_test_seed.mjs \
   --dry-run
 ```
 
-## Deploy Worker
+## Deploy Worker (Archived)
 
 Manual deploy:
 
 ```bash
-cd workers/uk_aq_aqi_history_r2_test_worker
+cd archive/2026-03-25_aqi_history_r2_test_worker_retired/uk_aq_aqi_history_r2_test_worker
 wrangler deploy
 ```
-
-Or push to `main` to trigger:
-
-- `.github/workflows/uk_aq_aqi_history_r2_test_worker_deploy.yml`
 
 ## Use The Test Page
 
