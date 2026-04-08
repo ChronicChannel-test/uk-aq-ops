@@ -33,6 +33,14 @@ Common optional settings:
 - `UK_AQ_R2_HISTORY_DAYS_API_URL`
 - `UK_AQ_R2_HISTORY_COUNTS_API_URL`
 - `DASHBOARD_UPSTREAM_BEARER_TOKEN`
+- `DROPBOX_APP_KEY`
+- `DROPBOX_APP_SECRET`
+- `DROPBOX_REFRESH_TOKEN`
+
+Dropbox status note:
+
+- If local checkpoint file discovery fails (for example in Cloud Run), the backend now fetches
+  the checkpoint JSON directly from Dropbox using `DROPBOX_APP_KEY/SECRET/REFRESH_TOKEN`.
 
 ## Auth model
 
