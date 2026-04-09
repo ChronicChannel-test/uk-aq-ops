@@ -19,6 +19,11 @@ Hosts the migrated Python dashboard backend API so the Cloudflare dashboard Work
 - `POST /api/connectors`
 - `POST /api/dispatcher_settings`
 
+`/api/snapshot` behavior:
+
+- Uses ingestdb service-role RPC (`uk_aq_station_snapshot`) for core station/timeseries/ingest observations.
+- Enriches response with ObsAQIDB rows via `uk_aq_public.uk_aq_rpc_observs_history_day_rows` and views `uk_aq_public.uk_aq_timeseries_aqi_hourly` / `uk_aq_public.uk_aq_timeseries_aqi_daily` when `OBS_AQIDB_SUPABASE_URL` + `OBS_AQIDB_SECRET_KEY` are configured.
+
 ## Runtime requirements
 
 Required env/secrets:
