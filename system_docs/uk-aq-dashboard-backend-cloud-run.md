@@ -1,7 +1,7 @@
 # UK AQ Dashboard Backend Cloud Run
 
 Repo owner: `uk-aq-ops`  
-Service source: `local/dashboard/server/uk_aq_dashboard_local.py`  
+Service source: `local/dashboard/server/uk_aq_dashboard_api.py`  
 Deploy workflow: `.github/workflows/uk_aq_dashboard_backend_cloud_run_deploy.yml`
 
 ## Purpose
