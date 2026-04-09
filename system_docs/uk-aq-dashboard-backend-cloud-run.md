@@ -11,6 +11,8 @@ Hosts the migrated Python dashboard backend API so the Cloudflare dashboard Work
 ## Routes served
 
 - `GET /api/dashboard`
+- `GET /api/config`
+- `GET /api/snapshot`
 - `GET /api/storage_coverage`
 - `GET /api/r2_metrics`
 - `GET /api/r2_connector_counts`
@@ -33,6 +35,7 @@ Common optional settings:
 - `UK_AQ_R2_HISTORY_DAYS_API_URL`
 - `UK_AQ_R2_HISTORY_COUNTS_API_URL`
 - `DASHBOARD_UPSTREAM_BEARER_TOKEN`
+- `CLEANAIRSURB_ST_ID` (default station id for `/api/config` and snapshot page load)
 - `DROPBOX_APP_KEY`
 - `DROPBOX_APP_SECRET`
 - `DROPBOX_REFRESH_TOKEN`
