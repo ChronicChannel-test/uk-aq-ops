@@ -39,6 +39,8 @@ Common optional settings:
 - `UK_AQ_DB_SIZE_API_TOKEN`
 - `UK_AQ_R2_HISTORY_DAYS_API_URL`
 - `UK_AQ_R2_HISTORY_COUNTS_API_URL`
+- `UK_AQ_R2_CLOUDFLARE_ACCOUNT_ID` (preferred for `/api/r2_metrics`; fallback: `CLOUDFLARE_ACCOUNT_ID`)
+- `UK_AQ_R2_CLOUDFLARE_API_TOKEN` (preferred for `/api/r2_metrics`; fallback: `CFLARE_API_READ_TOKEN`)
 - `DASHBOARD_UPSTREAM_BEARER_TOKEN`
 - `CLEANAIRSURB_ST_ID` (default station id for `/api/config` and snapshot page load)
 - `DROPBOX_APP_KEY`
