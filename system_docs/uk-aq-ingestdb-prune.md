@@ -25,6 +25,7 @@ Bucket key is:
 - Observations part rollover defaults to `1,000,000` rows per file.
 - Observations write each part directly to committed prefix (`history/v1/observations/...`) and persist resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
 - AQI levels are exported in the same run for completed observation days that are missing AQI day manifests; AQI rows are streamed from `uk_aq_aqilevels.timeseries_aqi_hourly` grouped by connector and written to `history/v1/aqilevels/...`.
+- AQI export preserves rows where `station_id` is null (instead of dropping them), so connector/day row-count validation stays aligned with source RPC totals.
 - Phase B writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.history_candidates`
   - `uk_aq_ops.prune_day_gates.history_done`
