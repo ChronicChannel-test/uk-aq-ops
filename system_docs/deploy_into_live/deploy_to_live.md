@@ -189,6 +189,20 @@ projects/432607103288/locations/global/workloadIdentityPools/github-pool/provide
 - `uk-aq-beta.chronicillnesschannel.co.uk` is already configured with Cloudflare Zero Trust
 - Confirm DNS routes to the live Cloudflare cache proxy worker once deployed in Phase 7
 
+### 0.8 Create Cloudflare Turnstile widget for live domain
+
+The Turnstile site key is domain-scoped — the test widget will return error `110200` (invalid site key) on any other domain. A new widget must be created for the live domain.
+
+1. Go to Cloudflare dashboard → **Turnstile** → Add widget
+2. Name: e.g. `uk-aq-live`
+3. Domains: add `uk-aq-beta.chronicillnesschannel.co.uk` (and `chronicillnesschannel.co.uk` for future public URL)
+4. Widget type: **Managed**
+5. Note the **Site Key** (public) and **Secret Key** (private)
+
+These are used in two places:
+- **Site key** → `UK_AQ_TURNSTILE_SITE_KEY` secret in the live **webpage** GitHub repo (injected into HTML at build time by `pages.yml`)
+- **Secret key** → `UK_AQ_TURNSTILE_SECRET_KEY` secret in the live **ingest** GitHub repo (used by the cache proxy worker to verify tokens server-side)
+
 ---
 
 ## Phase 1 — Live Repo Setup
@@ -248,7 +262,20 @@ grep -r "CIC-Test\|cic-test\|nmgierafoeuxfkkscrln\|izumkxuxseyojjsmnapi" \
 
 Update any hardcoded test Supabase project refs, test bucket names, or test worker names found.
 
-### 1.5 Init git and push each live repo
+### 1.5 Set live webpage GitHub repo secrets (before first push)
+
+The `pages.yml` workflow fires on every push to main and fails immediately if these secrets are absent. Set them in the live **webpage** repo before the first push.
+
+Go to GitHub → `LIVE-uk-aq-webpage` → Settings → Secrets and variables → Actions:
+
+| Secret | Value |
+|---|---|
+| `SUPABASE_PROJECT_REF` | live ingestdb project ref (from Phase 0.1) |
+| `SB_PUBLISHABLE_DEFAULT_KEY` | live ingestdb publishable key |
+| `UK_AQ_TURNSTILE_SITE_KEY` | live Turnstile **site key** (from Phase 0.8) |
+| `UK_AQ_AQI_HISTORY_BASE_URL` | `https://uk-aq-beta.chronicillnesschannel.co.uk/api/aq/aqi-history` |
+
+### 1.6 Init git and push each live repo
 
 ```bash
 for DIR in "LIVE-uk-aq-ingest" "LIVE-uk-aq-ops" "LIVE-uk-aq-schema" "LIVE-uk-aq-webpage"; do
@@ -261,7 +288,7 @@ for DIR in "LIVE-uk-aq-ingest" "LIVE-uk-aq-ops" "LIVE-uk-aq-schema" "LIVE-uk-aq-
 done
 ```
 
-### 1.6 Sync GitHub secrets and variables
+### 1.7 Sync GitHub secrets and variables (ingest/ops repos)
 
 Use the sync script (ops repo) to push all env vars to GitHub:
 ```bash
@@ -270,6 +297,8 @@ cd "$BASE/LIVE UK AQ Networks/LIVE-uk-aq-ops"
 ```
 
 The mapping reference is `config/uk_aq_github_env_targets.csv`.
+
+> **Note:** This script covers the ingest and ops repos. The webpage repo secrets (`UK_AQ_TURNSTILE_SITE_KEY`, `SUPABASE_PROJECT_REF`, `SB_PUBLISHABLE_DEFAULT_KEY`) are set manually — see Phase 1.5 above.
 
 ---
 
@@ -548,6 +577,7 @@ Complete Phase 0.4 before this step. Then add the following to the **LIVE-uk-aq-
 | `SB_PUBLISHABLE_DEFAULT_KEY` | live Supabase publishable key |
 | `SUPABASE_SECRETS_ENV` | contents of live `.env.supabase` |
 | `GCP_SA_KEY` | live GCP SA key JSON (if not using WIF) |
+| `UK_AQ_TURNSTILE_SECRET_KEY` | live Turnstile **secret key** (from Phase 0.8) — used by cache proxy worker to verify tokens |
 
 **GitHub Variables** (repo settings → Secrets and variables → Variables):
 
@@ -715,6 +745,26 @@ Run these checks before calling the blank deploy complete:
 - [ ] Website at `uk-aq-beta.chronicillnesschannel.co.uk` loads and shows data
 - [ ] `UK_AQ_R2_HISTORY_PHASE_B_ENABLED=true` confirmed in live
 - [ ] Live repos tagged `v1.0.0` in git
+
+---
+
+## Switching to public URL (chronicillnesschannel.co.uk/uk-aq)
+
+When promoting from beta (`uk-aq-beta.chronicillnesschannel.co.uk`) to the public sub-path:
+
+1. **Update `UK_AQ_AQI_HISTORY_BASE_URL`** in `LIVE-uk-aq-webpage` GitHub secrets:
+   - Change from: `https://uk-aq-beta.chronicillnesschannel.co.uk/api/aq/aqi-history`
+   - Change to: `https://chronicillnesschannel.co.uk/api/aq/aqi-history`
+
+2. **Update `UK_AQ_CACHE_ALLOWED_ORIGINS`** in the live ingest repo secrets to include `https://chronicillnesschannel.co.uk`.
+
+3. **Add the public domain to the Turnstile widget** (Cloudflare dashboard → Turnstile → edit widget → add `chronicillnesschannel.co.uk`).
+
+4. **Remove the custom domain** from `LIVE-uk-aq-webpage` GitHub Pages settings (delete the CNAME or clear the custom domain field). The `/uk-aq` sub-path takes over immediately.
+
+5. **Redeploy the cache proxy** (trigger `uk_aq_cache_proxy_deploy.yml`) so the updated allowed origins take effect.
+
+6. **Re-run the `pages.yml` workflow** on `LIVE-uk-aq-webpage` to rebuild GitHub Pages with the updated `UK_AQ_AQI_HISTORY_BASE_URL` injected into the HTML.
 
 ---
 ---
