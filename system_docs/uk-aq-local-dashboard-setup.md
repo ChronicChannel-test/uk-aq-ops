@@ -113,6 +113,17 @@ Leave live worker URLs empty if not yet deployed.
 
 ---
 
+## Storage Coverage Day Presence
+
+- Ingest DB day presence in the calendar now uses exact per-day checks via
+  `uk_aq_public.uk_aq_rpc_observations_hourly_fingerprint` on ingestdb.
+- A day is marked ingest-present only when the fingerprint RPC reports
+  `observation_count > 0` for that UTC day.
+- The previous oldest-day range inference is only used as a fallback if the
+  exact ingest day check is unavailable.
+
+---
+
 ## Install launchd services
 
 ### Test (dashboard + cloudflared tunnel)
