@@ -8,6 +8,7 @@ Deploy workflow: `.github/workflows/uk_aq_postcode_lookup_r2_api_worker_deploy.y
 - Resolve UK postcode queries to lat/lon for website map/search usage.
 - Read only one postcode-area shard from R2 per request.
 - Avoid loading a full UK postcode dataset into Worker memory.
+- Restrict direct access so only trusted app/proxy calls are accepted.
 
 ## Routes
 
@@ -34,6 +35,7 @@ Error cases:
 - `400`: `invalid_postcode`
 - `404`: `postcode_not_found`
 - `503`: `postcode_lookup_unavailable`
+- `401`: `unauthorized` (missing/invalid upstream auth header)
 
 ## Caching
 
@@ -45,6 +47,11 @@ Error cases:
 
 - R2 binding: `UK_AQ_POSTCODE_LOOKUP_BUCKET`
 - `UK_AQ_POSTCODE_R2_PREFIX` (default `v1`)
+- `UK_AQ_EDGE_UPSTREAM_SECRET`
+
+Required request header:
+
+- `x-uk-aq-upstream-auth: <UK_AQ_EDGE_UPSTREAM_SECRET>`
 
 ## Deployment variables/secrets
 
@@ -58,9 +65,11 @@ Variables:
 Secrets:
 
 - `UK_AQ_POSTCODE_R2_CLOUDFLARE_API_TOKEN` (optional; falls back to `UK_AQ_R2_CLOUDFLARE_API_TOKEN`)
+- `UK_AQ_EDGE_UPSTREAM_SECRET` (required; same upstream auth secret used by cache proxy)
 
 ## Notes
 
 - Build/upload pipeline lives under `scripts/postcodes/`.
-- Cache proxy route `/api/aq/postcode_lookup` should target this worker URL via:
+- Browser/frontend should call cache proxy route `/api/aq/postcode_lookup` rather than calling this worker directly.
+- Cache proxy should target this worker URL via:
   - `UK_AQ_POSTCODE_LOOKUP_R2_API_URL=https://<worker-host>/v1/postcode_lookup`
