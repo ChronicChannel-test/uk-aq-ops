@@ -78,6 +78,9 @@ Workflow `uk_aq_cache_proxy_deploy.yml`:
 2. Applies worker secrets/vars with `wrangler secret bulk`.
 3. Deploys worker code again so latest config is active.
 4. Fails fast if cache-specific Cloudflare credentials are missing.
+5. Fails fast if required postcode upstream URL variables are missing:
+   - `UK_AQ_POSTCODE_LOOKUP_R2_API_URL`
+   - `UK_AQ_POSTCODE_SUGGEST_R2_API_URL`
 
 Worker naming:
 
