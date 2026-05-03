@@ -5,7 +5,8 @@
 - `scripts/postcodes/build_postcode_lookup_from_onspd.mjs`
   - Reads ONSPD CSV and writes postcode shard JSON files plus `manifest.json`.
   - Shards are grouped by leading postcode area and keyed by normalized postcode.
-  - Postcode values are compact arrays: `[lat, lon, pcon_code, la_code]` (no PCON/LA names).
+  - Exact postcode values are compact arrays: `[lat, lon, pcon_code, la_code, area_town_id]` (no PCON/LA names).
+  - Suggest rows and prefix samples are compact arrays: `[postcode_normalised, postcode_display, area_town_id, pcon_code, la_code]`.
 
 - `scripts/postcodes/upload_postcode_lookup_to_r2.mjs`
   - Uploads shard files and `manifest.json` to R2 using S3-compatible API.

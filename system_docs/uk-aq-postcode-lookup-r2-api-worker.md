@@ -78,7 +78,8 @@ Secrets:
 
 - Build/upload pipeline lives under `scripts/postcodes/`.
 - Shard build source currently used: `ONSPD_MAY_2025_UK.csv`.
-- Shard row format is compact: `[lat, lon, pcon_code, la_code]`.
+- Exact shard row format is compact: `[lat, lon, pcon_code, la_code, area_town_id]`.
+- Suggest shard and prefix sample row format is compact: `[postcode_normalised, postcode_display, area_town_id, pcon_code, la_code]`.
 - Compatibility gate script:
   - `npm run postcode:check-geography -- --postcode-dir ... --pcon-geojson ... --la-geojson ...`
 - Browser/frontend should call cache proxy route `/api/aq/postcode_lookup` rather than calling this worker directly.
