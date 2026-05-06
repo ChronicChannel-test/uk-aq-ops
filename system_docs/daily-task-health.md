@@ -94,10 +94,10 @@ Instrumented GitHub tasks:
 | `ingest.stations_daily` | `uk-aq-ingest/.github/workflows/uk_aq_stations_daily.yml` |
 | `ops.r2_history_dropbox_backup` | `uk-aq-ops/.github/workflows/uk_aq_r2_history_dropbox_backup.yml` |
 
-Required GitHub secrets:
+Required GitHub repo/org configuration:
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_URL` as a repository or organization variable
+- `SUPABASE_SERVICE_ROLE_KEY` as a repository or organization secret
 
 Optional controls:
 
