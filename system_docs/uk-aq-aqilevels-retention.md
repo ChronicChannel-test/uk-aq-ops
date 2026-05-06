@@ -5,7 +5,7 @@ This deploys a dedicated Cloud Run service that enforces rolling retention for `
 ## Runtime behavior
 
 `POST /run` performs:
-- compute DST-aware cutoff from Europe/London local days
+- compute strict UTC-day cutoff (keeps the last `OBS_AQIDB_AQILEVELS_RETENTION_DAYS` full UTC days)
 - fetch day-level cleanup candidates older than cutoff
 - check committed R2 History manifest before each drop:
   - HEAD `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
