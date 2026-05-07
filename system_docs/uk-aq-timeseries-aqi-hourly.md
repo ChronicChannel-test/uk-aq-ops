@@ -108,6 +108,12 @@ Behavior by mode:
 - all modes that write AQI:
   - refresh daily/monthly rollups across the actual recomputed window and affected timeseries
   - log `run_mode`, `window_start_utc`, and `window_end_utc` into `uk_aq_ops.aqi_compute_runs` within `obs_aqidb`
+  - run station-link health check RPC `uk_aq_rpc_timeseries_aqi_station_link_health` across the same window/timeseries scope and emit `aqi_station_link_anomaly` logs when null/mismatched station links are detected
+
+Obs AQI DB hardening notes:
+
+- `uk_aq_public.uk_aq_rpc_timeseries_aqi_hourly_upsert` now backfills missing incoming `station_id` from `uk_aq_core.timeseries.station_id` before write.
+- `uk_aq_public.uk_aq_rpc_timeseries_aqi_rollups_refresh` now joins rollup counts with null-safe `station_id`/`connector_id` matching to avoid duplicate level aggregation when station links differ.
 
 `UK_AQ_AQI_TIMESERIES_IDS_CSV` scopes helper rebuilds, helper fetches, and rollup refreshes for manual targeted runs, including targeted backfill or reconciliation.
 
