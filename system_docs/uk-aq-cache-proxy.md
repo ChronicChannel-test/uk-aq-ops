@@ -43,6 +43,9 @@ Read endpoints:
   - uses the long-lived postcode cache profile (`max-age=86400`)
 - `/api/aq/postcode_suggest` -> external postcode suggest R2 API URL (`UK_AQ_POSTCODE_SUGGEST_R2_API_URL`)
   - uses the long-lived postcode cache profile (`max-age=86400`)
+- `/api/aq/latest-snapshot` -> external latest snapshot R2 API URL (`UK_AQ_LATEST_SNAPSHOT_R2_API_URL`)
+  - serves deterministic latest snapshot objects from R2 (`pollutant/window/network_group`)
+  - uses realtime cache profile (`max-age=60`)
 
 ## Required GitHub env/secret targets
 
@@ -50,6 +53,7 @@ Variables:
 
 - `SUPABASE_URL`
 - `UK_AQ_AQI_HISTORY_R2_API_URL`
+- `UK_AQ_LATEST_SNAPSHOT_R2_API_URL`
 - `UK_AQ_POSTCODE_LOOKUP_R2_API_URL`
 - `UK_AQ_POSTCODE_SUGGEST_R2_API_URL`
 - `UK_AQ_CACHE_ALLOWED_ORIGINS`
