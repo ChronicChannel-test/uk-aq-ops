@@ -49,3 +49,42 @@
     - `UK_AQ_BACKFILL_MONTH_MAX_RUNS_PER_MINUTE` (default `0`, disabled)
     - `UK_AQ_BACKFILL_MONTH_MAX_RUNS_PER_HOUR` (default `0`, disabled)
   - Existing spacing control still applies via `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS`.
+
+## History integrity scripts
+
+See [`uk-aq-history-integrity.md`](uk-aq-history-integrity.md) for the full
+system doc.
+
+- `scripts/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh`
+  - Thin shell launcher; loads `<ENV>.env`, runs guardrails, creates state
+    dirs, takes a per-environment PID lock, then calls the python entrypoint.
+  - Required arg `--env CIC-Test|LIVE`; forwards `--profile`, `--source`,
+    `--from-day`, `--to-day`, `--dry-run`, `--check-only`, `--run-backfill`,
+    `--max-download-mb`, `--max-runtime-minutes`, `--verbose` to python.
+  - Deploys to `/Users/mikehinford/uk-aq-history-integrity/bin/`; in-repo
+    location is the source of truth.
+
+- `scripts/uk-aq-history-integrity/bin/uk-aq-history-integrity.py`
+  - Python entrypoint. Phase 1: env/path guardrails, SQLite schema
+    (`integrity_runs`, `source_file_state`, `source_file_events`,
+    `core_snapshot_imports`), run row, JSON+MD summary report under
+    `state/<ENV>/reports/`.
+  - Phase 2: imports the latest core snapshot from
+    `UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT` (verifying `manifest.json` and
+    per-table SHA-256), populates `core_connectors_snapshot`,
+    `core_stations_snapshot`, `core_timeseries_snapshot`,
+    `core_phenomena_snapshot`, and rebuilds
+    `source_station_timeseries_lookup` for `openaq` and
+    `sensor-community`. Reuses on unchanged manifest hash;
+    `--force-snapshot-import` overrides; `--skip-snapshot-import` for
+    debug; `--dry-run` reports without writing.
+  - Phase 3: OpenAQ adapter — HEADs `https://openaq-data-archive.s3.amazonaws.com`
+    (overridable via `UK_AQ_HISTORY_INTEGRITY_OPENAQ_BASE_URL`) for every
+    `(location, day)` from the lookup × `[--from-day, --to-day]`. Downloads only
+    on metadata change, hashes both compressed and uncompressed, moves changed
+    files into `state/<ENV>/source-cache/openaq/...`, and writes
+    `first_seen`/`first_seen_missing`/`disappeared`/`reappeared`/`changed`
+    events. `--max-download-mb` and `--max-runtime-minutes` enforce
+    cooperative limits (run ends with `status=stopped_limit`).
+    `--run-backfill` prints the planned narrow command (Phase 4 wires real exec).
+  - Sensor.Community adapter and real backfill execution land in Phases 4 / 5.
