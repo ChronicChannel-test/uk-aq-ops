@@ -339,7 +339,7 @@ Python interpreter defaults to `python3`; override with
 --to-day YYYY-MM-DD                     (manual profile or override)
 --dry-run                               No DB writes / no remote calls; logs the snapshot and OpenAQ plan.
 --check-only                            (Phase 5 wires Sensor.Community; OpenAQ already check-only by default)
---run-backfill                          Invoke UK_AQ_BACKFILL_WRAPPER per changed file (narrow timeseries × day); no-op under --dry-run.
+--run-backfill                          Invoke UK_AQ_BACKFILL_WRAPPER for changed-day batches (union timeseries IDs per day); no-op under --dry-run.
 --max-download-mb N                     Soft cap on per-run downloaded MB (cooperative; checked before each request).
 --max-runtime-minutes N                 Soft cap on per-run runtime minutes (cooperative; checked before each request).
 --concurrency N                         Worker count for the per-file thread pool (default 8; UK_AQ_HISTORY_INTEGRITY_CONCURRENCY overrides). 1 = strict sequential.
@@ -890,6 +890,55 @@ dry-run:
 run-backfill:
   call existing backfill wrapper
 ```
+
+### Exact meaning of "changed files" / "source-change events"
+
+The checker evaluates each candidate source file and assigns an outcome.
+For backfill triggering, only these outcomes are treated as
+source-change events (and written as `source_file_events.event_type`):
+
+```text
+first_seen
+reappeared
+changed
+```
+
+These outcomes do **not** trigger backfill:
+
+```text
+first_seen_missing
+disappeared
+still_missing
+unchanged_metadata
+unchanged_content
+```
+
+Notes:
+
+- `changed` means canonical content hash changed (OpenAQ uses
+  `sha256_uncompressed` as the decisive signal), not just metadata.
+- A metadata-only change that downloads but hashes to the same content is
+  `unchanged_content` and does not trigger backfill.
+- `disappeared`/`still_missing` are recorded for visibility but do not
+  trigger backfill because there is no source file to rebuild from.
+
+### Exact `--run-backfill` trigger rule
+
+Backfill is attempted only when all conditions are true:
+
+1. `--run-backfill` is set.
+2. `--dry-run` is **not** set.
+3. At least one source-change event exists (`first_seen`/`reappeared`/`changed`).
+
+Execution shape:
+
+- The run first completes source checks/downloads.
+- It then groups source-change events by `day_utc`.
+- It calls the wrapper once per day with the union of affected
+  `timeseries_ids` for that day.
+
+So if a run ends with `backfills_attempted=0`, it means no source-change
+events were found in the scanned window (even if `--run-backfill` was set).
 
 ---
 
