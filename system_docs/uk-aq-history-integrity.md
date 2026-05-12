@@ -193,7 +193,7 @@ UK_AQ_HISTORY_INTEGRITY_DROPBOX_DB_COPY_PATH="/Users/mikehinford/Dropbox/Apps/gi
 UK_AQ_R2_HISTORY_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history"
 UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history/history/v1/core"
 
-UK_AQ_BACKFILL_WRAPPER="/PATH/TO/CIC-Test/uk_aq_backfill_local_monthly.sh"
+UK_AQ_BACKFILL_WRAPPER="Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq Operations/CIC-test-uk-aq-ops/scripts/uk_aq_backfill_local_monthly.sh"
 UK_AQ_BACKFILL_ENV_FILE="/PATH/TO/CIC-Test/backfill.env"
 ```
 
@@ -334,7 +334,7 @@ Python interpreter defaults to `python3`; override with
 ```text
 --env CIC-Test|LIVE                     (required)
 --profile daily|weekly|monthly|manual   (default: manual)
---source openaq|sensor-community|all    (default: all)
+--source openaq|sensorcommunity|all      (default: all)
 --from-day YYYY-MM-DD                   (manual profile or override)
 --to-day YYYY-MM-DD                     (manual profile or override)
 --dry-run                               No DB writes / no remote calls; logs the snapshot and OpenAQ plan.
@@ -365,7 +365,7 @@ Default date windows (UTC dates):
 ```text
 daily:
   from = today - 21 days
-  to   = today - 4 days
+  to   = today - 6 days
 
 weekly:
   from = today - 120 days
@@ -376,7 +376,8 @@ monthly:
   to   = today - 4 days
 ```
 
-The `today - 4 days` upper bound gives a buffer beyond OpenAQ's 72-hour
+Daily uses `today - 6 days` as the upper bound. Weekly/monthly use
+`today - 4 days`. These buffers give headroom beyond OpenAQ's 72-hour
 publication delay. `today` is computed in UTC.
 
 `--from-day` / `--to-day` always override the profile defaults if supplied.
@@ -393,6 +394,10 @@ Stagger CIC-Test and LIVE so they do not overlap.
 ```cron
 # CIC-Test daily check
 30 4 * * * /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env CIC-Test --profile daily >> /Users/mikehinford/uk-aq-history-integrity/state/CIC-Test/logs/cron.log 2>&1
+
+If you want it to auto-backfill, use:
+
+30 4 * * * /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env CIC-Test --profile daily --run-backfill  >> /Users/mikehinford/uk-aq-history-integrity/state/CIC-Test/logs/cron.log 2>&1
 
 # LIVE daily check
 30 5 * * * /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env LIVE --profile daily >> /Users/mikehinford/uk-aq-history-integrity/state/LIVE/logs/cron.log 2>&1
@@ -462,8 +467,8 @@ source_key + source_location_id (= stations.station_ref)
 `source_file_events`. The mapping from core `connector_code` is:
 
 ```text
-openaq          -> openaq
-sensorcommunity -> sensor-community
+openaq
+sensorcommunity
 ```
 
 OpenAQ `location_id` = `stations.station_ref` (confirmed in
@@ -642,7 +647,7 @@ state/CIC-Test/source-cache/openaq/locationid=12345/year=2026/month=05/location-
 Example Sensor.Community cache path:
 
 ```text
-state/CIC-Test/source-cache/sensor-community/2026-05-07/<filename>.csv
+state/CIC-Test/source-cache/sensorcommunity/2026-05-07/<filename>.csv
 ```
 
 Do not cache unchanged downloads permanently unless explicitly configured.
@@ -1084,7 +1089,7 @@ Delivered:
 - Streaming gzipped-NDJSON import for `connectors`, `stations`,
   `timeseries`, `phenomena` into `core_*_snapshot` tables.
 - Derived `source_station_timeseries_lookup` for `openaq` and
-  `sensor-community`, filtered to non-removed stations.
+  `sensorcommunity`, filtered to non-removed stations.
 - Reuse decision based on `manifest_hash` plus a
   snapshot-tables-have-rows safety check; `core_snapshot_imports` row
   written for every attempt (`running`/`ok`/`error`).
@@ -1200,8 +1205,8 @@ Delivered:
 - State / event semantics identical to OpenAQ
   (`first_seen / first_seen_missing / disappeared / reappeared / changed`);
   rows in `source_file_state` and `source_file_events` are stamped with
-  `source_key='sensor-community'`.
-- Source-cache layout: `state/<ENV>/source-cache/sensor-community/<YYYY-MM-DD>/<filename>.csv`.
+  `source_key='sensorcommunity'`.
+- Source-cache layout: `state/<ENV>/source-cache/sensorcommunity/<YYYY-MM-DD>/<filename>.csv`.
 - Backfill batching (Phase 4 Pass 2 logic) runs at the end of the SC
   scan: changed files grouped by `day_utc`, single wrapper call per day
   with the union of timeseries IDs, per-call log file under

@@ -75,7 +75,7 @@ system doc.
     `core_stations_snapshot`, `core_timeseries_snapshot`,
     `core_phenomena_snapshot`, and rebuilds
     `source_station_timeseries_lookup` for `openaq` and
-    `sensor-community`. Reuses on unchanged manifest hash;
+    `sensorcommunity`. Reuses on unchanged manifest hash;
     `--force-snapshot-import` overrides; `--skip-snapshot-import` for
     debug; `--dry-run` reports without writing.
   - Phase 3: OpenAQ adapter — HEADs `https://openaq-data-archive.s3.amazonaws.com`
@@ -102,7 +102,7 @@ system doc.
     (overridable via `UK_AQ_HISTORY_INTEGRITY_SENSOR_COMMUNITY_BASE_URL`),
     parses HTML for `sensor_id -> filename`, then HEAD/download/hash
     each matched file. Plain CSV (no gzip).
-    `state/<ENV>/source-cache/sensor-community/<YYYY-MM-DD>/<filename>.csv`.
+    `state/<ENV>/source-cache/sensorcommunity/<YYYY-MM-DD>/<filename>.csv`.
     Backfills are batched per day at the end of the SC scan, identical
     to the OpenAQ flow. `--max-download-mb` / `--max-runtime-minutes`
     span both adapters via a shared `LimitTracker`.
