@@ -10,6 +10,7 @@ Scheduler implementation location in the ops repo:
 - `cloudflare/workflow-scheduler/wrangler.toml.example`
 - `cloudflare/workflow-scheduler/README.md`
 - deploy workflow: `.github/workflows/uk_aq_workflow_scheduler_deploy.yml`
+  - deploy run auto-replaces `YOUR_GITHUB_OWNER` with `${{ github.repository_owner }}`
 
 ## Workflows Scheduled Externally
 
