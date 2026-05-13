@@ -7,10 +7,12 @@ GitHub-hosted cron has shown late or inconsistent starts for daily operational w
 Scheduler implementation location in the ops repo:
 
 - `cloudflare/workflow-scheduler/worker.js`
+- `cloudflare/workflow-scheduler/wrangler.toml`
 - `cloudflare/workflow-scheduler/wrangler.toml.example`
 - `cloudflare/workflow-scheduler/README.md`
 - deploy workflow: `.github/workflows/uk_aq_workflow_scheduler_deploy.yml`
   - deploy run auto-replaces `YOUR_GITHUB_OWNER` with `${{ github.repository_owner }}`
+  - deploy run validates `worker.js` cron values match `wrangler.toml`
 
 ## Workflows Scheduled Externally
 
@@ -19,7 +21,7 @@ Scheduler implementation location in the ops repo:
 | ingest | `uk_aq_stations_daily.yml` | 03:00 daily | `0 3 * * *` |
 | ops | `uk_aq_r2_core_snapshot.yml` | 04:15 daily | `15 4 * * *` |
 | ops | `uk_aq_r2_history_dropbox_backup.yml` | 04:35 daily | `35 4 * * *` |
-| ops | `uk_aq_dropbox_prune_raw.yml` | 05:49 daily | `49 5 * * *` |
+| ops | `uk_aq_dropbox_prune_raw.yml` | 09:00 daily | `0 9 * * *` |
 
 ## Workflows Intentionally Kept On GitHub Cron
 
