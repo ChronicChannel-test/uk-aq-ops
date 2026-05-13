@@ -1,0 +1,40 @@
+# Cloudflare Workflow Scheduler
+
+## Why GitHub Cron Was Disabled For These Jobs
+
+GitHub-hosted cron has shown late or inconsistent starts for daily operational workflows. These specific daily workflows are now externally scheduled via Cloudflare Workers Cron Triggers and dispatched through GitHub `workflow_dispatch` API calls.
+
+Scheduler implementation location in the ops repo:
+
+- `cloudflare/workflow-scheduler/worker.js`
+- `cloudflare/workflow-scheduler/wrangler.toml.example`
+- `cloudflare/workflow-scheduler/README.md`
+
+## Workflows Scheduled Externally
+
+| Repo | Workflow File | Intended UTC Schedule | Cloudflare Cron |
+|---|---|---:|---|
+| ingest | `uk_aq_stations_daily.yml` | 03:00 daily | `0 3 * * *` |
+| ops | `uk_aq_r2_core_snapshot.yml` | 04:15 daily | `15 4 * * *` |
+| ops | `uk_aq_r2_history_dropbox_backup.yml` | 04:35 daily | `35 4 * * *` |
+| ops | `uk_aq_dropbox_prune_raw.yml` | 05:49 daily | `49 5 * * *` |
+
+## Workflows Intentionally Kept On GitHub Cron
+
+These were not moved to Cloudflare by design:
+- `codeql-noarchive.yml`
+- Monthly workflows (for example UK-AIR SOS monthly and monthly index maintenance)
+- 5-minute egress monitor workflows
+- Deploy workflows that only contain cron-like env-var strings without a real GitHub `on.schedule` trigger
+
+## Manual Recovery Process
+
+If an expected run does not appear:
+1. Check Cloudflare Worker logs for the scheduled event time and GitHub API status.
+2. Check GitHub Actions for the target workflow and confirm no repo/token permission errors.
+3. Manually run the workflow from GitHub Actions using `workflow_dispatch` (`Run workflow`).
+4. Fix token/config issues in the Worker deployment, then re-run missed workflows manually if needed.
+
+## Environment Separation
+
+CIC-Test and LIVE use separate Cloudflare accounts and separate Worker deployments. The scheduler Worker is intentionally simple and not environment-aware; each deployment owns its own job config and GitHub token.

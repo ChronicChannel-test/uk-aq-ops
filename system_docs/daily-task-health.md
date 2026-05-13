@@ -22,7 +22,7 @@ Daily task health tracks whether expected daily scheduled jobs reported for a UT
 
 ## Due Times
 
-GitHub Actions scheduled workflows can start much later than their cron time, so `due_time_utc` is the reliable missing-run threshold. The seed data gives GitHub jobs a larger grace period, including extra runtime allowance for the R2 Dropbox backup, while GCP jobs use about 30 minutes. Check the seeded times against deployed GitHub/GCP schedules before relying on them operationally.
+Daily workflows that report through GitHub can start later than intended schedule times, so `due_time_utc` is the reliable missing-run threshold. The seed data gives GitHub-origin tasks a larger grace period, including extra runtime allowance for the R2 Dropbox backup, while GCP jobs use about 30 minutes. Check seeded times against deployed scheduler timings before relying on them operationally.
 
 ## Phase 2 GCP Reporting
 
@@ -81,7 +81,7 @@ from uk_aq_ops.daily_task_status
 where date_utc = current_date;
 ```
 
-GitHub tasks (`ingest.stations_daily` and `ops.r2_history_dropbox_backup`) are still Phase 3.
+GitHub tasks (`ingest.stations_daily` and `ops.r2_history_dropbox_backup`) are still Phase 3 and are externally scheduled via Cloudflare Worker cron calling `workflow_dispatch`.
 
 ## Phase 3 GitHub Reporting
 

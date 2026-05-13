@@ -69,14 +69,16 @@ Restore workflow (manual):
 
 - `.github/workflows/uk_aq_r2_history_restore_from_dropbox.yml`
 
-Default schedule:
+Intended schedule:
 
-- `35 4 * * *` (UTC)
+- `04:35 UTC` daily via external Cloudflare Worker scheduler (`workflow_dispatch`).
+- Previous GitHub cron: `35 4 * * *` (UTC).
 
 Core snapshot workflow (R2 write):
 
 - `.github/workflows/uk_aq_r2_core_snapshot.yml`
-- default schedule: `15 4 * * *` (UTC)
+- intended schedule: `04:15 UTC` daily via external Cloudflare Worker scheduler
+- previous GitHub cron: `15 4 * * *` (UTC)
 - script: `scripts/backup_r2/uk_aq_core_snapshot_to_r2.mjs`
 - output per day:
   - `history/v1/core/day_utc=YYYY-MM-DD/manifest.json`

@@ -14,9 +14,10 @@ GitHub workflow:
 
 - `.github/workflows/uk_aq_r2_core_snapshot.yml`
 
-Default schedule:
+Intended schedule:
 
-- `15 4 * * *` (UTC)
+- `04:15 UTC` daily via external Cloudflare Worker scheduler (`workflow_dispatch`).
+- Previous GitHub cron: `15 4 * * *` (UTC).
 
 Dispatch inputs:
 
