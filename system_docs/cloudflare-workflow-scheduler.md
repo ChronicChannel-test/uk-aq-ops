@@ -9,6 +9,7 @@ Scheduler implementation location in the ops repo:
 - `cloudflare/workflow-scheduler/worker.js`
 - `cloudflare/workflow-scheduler/wrangler.toml.example`
 - `cloudflare/workflow-scheduler/README.md`
+- deploy workflow: `.github/workflows/uk_aq_workflow_scheduler_deploy.yml`
 
 ## Workflows Scheduled Externally
 
@@ -34,6 +35,14 @@ If an expected run does not appear:
 2. Check GitHub Actions for the target workflow and confirm no repo/token permission errors.
 3. Manually run the workflow from GitHub Actions using `workflow_dispatch` (`Run workflow`).
 4. Fix token/config issues in the Worker deployment, then re-run missed workflows manually if needed.
+
+## Deploy Prerequisites (GitHub Actions)
+
+- Secret: `CLOUDFLARE_ACCOUNT_ID`
+- Secret: `CLOUDFLARE_API_TOKEN`
+- Reserved secret: `GITHUB_TOKEN`
+- Optional variable: `UK_AQ_WORKFLOW_SCHEDULER_WORKER_NAME` (default `uk-aq-workflow-scheduler`)
+- Optional secret: `UK_AQ_WORKFLOW_SCHEDULER_MANUAL_TRIGGER_KEY`
 
 ## Environment Separation
 
