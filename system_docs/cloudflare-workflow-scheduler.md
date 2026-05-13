@@ -40,7 +40,7 @@ If an expected run does not appear:
 
 - Secret: `CLOUDFLARE_ACCOUNT_ID`
 - Secret: `CLOUDFLARE_API_TOKEN`
-- Reserved secret: `GITHUB_TOKEN`
+- Secret: `UK_AQ_WORKFLOW_SCHEDULER_GITHUB_DISPATCH_TOKEN`
 - Optional variable: `UK_AQ_WORKFLOW_SCHEDULER_WORKER_NAME` (default `uk-aq-workflow-scheduler`)
 - Optional secret: `UK_AQ_WORKFLOW_SCHEDULER_MANUAL_TRIGGER_KEY`
 
