@@ -193,7 +193,7 @@ UK_AQ_HISTORY_INTEGRITY_DROPBOX_DB_COPY_PATH="/Users/mikehinford/Dropbox/Apps/gi
 UK_AQ_R2_HISTORY_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history"
 UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history/history/v1/core"
 
-UK_AQ_BACKFILL_WRAPPER="Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq Operations/CIC-test-uk-aq-ops/scripts/uk_aq_backfill_local_monthly.sh"
+UK_AQ_BACKFILL_WRAPPER="Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq Operations/CIC-test-uk-aq-ops/scripts/uk_aq_backfill_local.sh"
 UK_AQ_BACKFILL_ENV_FILE="/PATH/TO/CIC-Test/backfill.env"
 ```
 
@@ -1228,7 +1228,7 @@ Pass 2 (batching, logs, monitoring):
   a soft cap trips; remaining days are skipped (their events stay with
   `backfill_status` unset).
 - **Real-wrapper integration verified.** Smoke test invokes the actual
-  `scripts/uk_aq_backfill_local_monthly.sh` via the integrity runner —
+  `scripts/uk_aq_backfill_local.sh` via the integrity runner —
   the wrapper passes its `require_env` checks (proving env injection
   matches the wrapper's contract) and we capture the downstream
   exit/stderr in the per-call log file.
@@ -1401,7 +1401,7 @@ relevant phase:
    filename → station_ref mapping for the daily archive still needs to be
    confirmed in Phase 5.
 6. Whether the existing backfill wrapper already supports
-   `UK_AQ_BACKFILL_TIMESERIES_IDS` (see `scripts/uk_aq_backfill_local_monthly.sh`
+   `UK_AQ_BACKFILL_TIMESERIES_IDS` (see `scripts/uk_aq_backfill_local.sh`
    — it documents `UK_AQ_BACKFILL_TIMESERIES_IDS` and `UK_AQ_BACKFILL_TIMESERIES_ID`
    in its usage, but actual filter behaviour should be verified before Phase 4).
 7. Whether source-to-R2 can consume a local cached source file directly, or

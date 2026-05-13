@@ -38,17 +38,19 @@
 
 ## Backfill scripts
 
-- `scripts/uk_aq_backfill_local_monthly.sh`
-  - Runs local backfill month-by-month (`local_to_aqilevels`, `obs_aqi_to_r2`, `source_to_r2`, `r2_history_obs_to_aqilevels`).
+- `scripts/uk_aq_backfill_local.sh`
+  - Runs local backfill (`local_to_aqilevels`, `obs_aqi_to_r2`, `source_to_r2`, `r2_history_obs_to_aqilevels`).
   - Always forces `UK_AQ_BACKFILL_TRIGGER_MODE=manual` for local runs.
   - Resolves the backfill runner from:
     - `UK_AQ_BACKFILL_RUN_JOB_PATH` (optional override), else
-    - `workers/uk_aq_backfill_cloud_run/run_job.ts`.
+    - `workers/uk_aq_backfill_local/run_job.ts`.
   - Archive paths are treated as retired and are not valid runner paths for active runs.
   - Supports local run throttling:
-    - `UK_AQ_BACKFILL_MONTH_MAX_RUNS_PER_MINUTE` (default `0`, disabled)
-    - `UK_AQ_BACKFILL_MONTH_MAX_RUNS_PER_HOUR` (default `0`, disabled)
-  - Existing spacing control still applies via `UK_AQ_BACKFILL_MONTH_RUN_INTERVAL_SECONDS`.
+    - `UK_AQ_BACKFILL_MAX_RUNS_PER_MINUTE` (default `0`, disabled)
+    - `UK_AQ_BACKFILL_MAX_RUNS_PER_HOUR` (default `0`, disabled)
+  - Existing spacing control still applies via `UK_AQ_BACKFILL_RUN_INTERVAL_SECONDS`.
+  - Full behavior and merge-mode details are documented in:
+    - [`uk-aq-backfill-local.md`](uk-aq-backfill-local.md)
 
 ## History integrity scripts
 
