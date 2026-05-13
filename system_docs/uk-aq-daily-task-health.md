@@ -10,6 +10,7 @@ Daily task health tracks whether expected daily scheduled jobs reported for a UT
 | `ops.observs_partition_maintenance` | Observations partition maintenance | gcp | `uk-aq-ops` |
 | `ingest.stations_daily` | Stations daily | github | `uk-aq-ingest` |
 | `ops.r2_history_dropbox_backup` | R2 history Dropbox backup | github | `uk-aq-ops` |
+| `ops.dropbox_prune_raw` | Dropbox prune raw | github | `uk-aq-ops` |
 | `ops.supabase_db_dump_backup` | Supabase DB dump backup | gcp | `uk-aq-ops` |
 
 ## Tables
@@ -81,11 +82,11 @@ from uk_aq_ops.daily_task_status
 where date_utc = current_date;
 ```
 
-GitHub tasks (`ingest.stations_daily` and `ops.r2_history_dropbox_backup`) are still Phase 3 and are externally scheduled via Cloudflare Worker cron calling `workflow_dispatch`.
+GitHub tasks (`ingest.stations_daily`, `ops.r2_history_dropbox_backup`, and `ops.dropbox_prune_raw`) are still Phase 3 and are externally scheduled via Cloudflare Worker cron calling `workflow_dispatch`.
 
 ## Phase 3 GitHub Reporting
 
-The GitHub daily workflows report final-only status with `uk_aq_rpc_daily_task_report_final`. There is no Started row for these jobs in v1 because GitHub scheduled workflows can start late, be retried, or fail before a start-reporting step is useful.
+The GitHub daily workflows report lifecycle status: they write `Started` at workflow begin and then `Finished` or `Failed` at workflow end.
 
 Instrumented GitHub tasks:
 
@@ -93,6 +94,7 @@ Instrumented GitHub tasks:
 | --- | --- |
 | `ingest.stations_daily` | `uk-aq-ingest/.github/workflows/uk_aq_stations_daily.yml` |
 | `ops.r2_history_dropbox_backup` | `uk-aq-ops/.github/workflows/uk_aq_r2_history_dropbox_backup.yml` |
+| `ops.dropbox_prune_raw` | `uk-aq-ops/.github/workflows/uk_aq_dropbox_prune_raw.yml` |
 
 Required GitHub repo/org configuration:
 
@@ -105,12 +107,14 @@ Optional controls:
 - `DAILY_TASK_HEALTH_STRICT=true` makes reporting/recompute failures fail the final step.
 - `DAILY_TASK_SCHEDULED_FOR_DATE=YYYY-MM-DD` overrides the UTC date for testing.
 
-The reporting step runs with `if: always()` and maps GitHub job status to daily task status:
+The started step calls `uk_aq_rpc_daily_task_started` and outputs a `health_run_id`. The final step runs with `if: always()` and uses that run id to call `uk_aq_rpc_daily_task_finished` or `uk_aq_rpc_daily_task_failed`:
 
 - `success` -> `Finished`
 - `failure`, `cancelled`, or any other non-success status -> `Failed`
 
-The script records GitHub metadata in `summary`, including repository, workflow, run id, run attempt, SHA, ref, event name, actor, and a GitHub Actions run URL. The table attempt is left for the RPC to allocate so repeated `workflow_dispatch` tests on the same UTC day do not collide on attempt `1`.
+If the run id is unavailable, reporting falls back to `uk_aq_rpc_daily_task_report_final`.
+
+The script records GitHub metadata in `summary`, including repository, workflow, run id, run number, run attempt, SHA, ref, event name, actor, and a GitHub Actions run URL.
 
 GitHub due times are still controlled by `uk_aq_ops.daily_task_definitions.due_time_utc`. A GitHub workflow is only Missing after the configured due time passes with no final report.
 
@@ -118,12 +122,13 @@ Manual validation:
 
 1. Run `uk_aq_stations_daily.yml` manually via `workflow_dispatch` to test `ingest.stations_daily`.
 2. Run `uk_aq_r2_history_dropbox_backup.yml` manually via `workflow_dispatch` to test `ops.r2_history_dropbox_backup`.
-3. Query the resulting runs and day status:
+3. Run `uk_aq_dropbox_prune_raw.yml` manually via `workflow_dispatch` to test `ops.dropbox_prune_raw`.
+4. Query the resulting runs and day status:
 
 ```sql
 select *
 from uk_aq_ops.daily_task_runs
-where task_key in ('ingest.stations_daily', 'ops.r2_history_dropbox_backup')
+where task_key in ('ingest.stations_daily', 'ops.r2_history_dropbox_backup', 'ops.dropbox_prune_raw')
 order by created_at desc
 limit 20;
 
