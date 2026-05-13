@@ -11,8 +11,11 @@ Scheduler implementation location in the ops repo:
 - `cloudflare/workflow-scheduler/wrangler.toml.example`
 - `cloudflare/workflow-scheduler/README.md`
 - deploy workflow: `.github/workflows/uk_aq_workflow_scheduler_deploy.yml`
+  - auto-runs on pushes to `main` when `cloudflare/workflow-scheduler/**` changes
+  - also supports manual `workflow_dispatch`
   - deploy run auto-replaces `YOUR_GITHUB_OWNER` with `${{ github.repository_owner }}`
-  - deploy run validates `worker.js` cron values match `wrangler.toml`
+  - deploy run auto-syncs `worker.js` cron values from `wrangler.toml`
+  - deploy run validates cron alignment after sync
 
 ## Workflows Scheduled Externally
 
@@ -21,7 +24,7 @@ Scheduler implementation location in the ops repo:
 | ingest | `uk_aq_stations_daily.yml` | 03:00 daily | `0 3 * * *` |
 | ops | `uk_aq_r2_core_snapshot.yml` | 04:15 daily | `15 4 * * *` |
 | ops | `uk_aq_r2_history_dropbox_backup.yml` | 04:35 daily | `35 4 * * *` |
-| ops | `uk_aq_dropbox_prune_raw.yml` | 09:00 daily | `0 9 * * *` |
+| ops | `uk_aq_dropbox_prune_raw.yml` | 09:22 daily | `22 9 * * *` |
 
 ## Workflows Intentionally Kept On GitHub Cron
 
