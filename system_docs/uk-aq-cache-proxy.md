@@ -24,6 +24,20 @@ Read endpoints:
 
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
+  - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now runs R2-first stitching in cache proxy:
+    - fetches observations history first from `UK_AQ_OBSERVS_HISTORY_R2_API_URL`
+    - computes tail from actual `r2_coverage_end`
+    - fetches ingest tail/slices from `uk_aq_timeseries` origin
+    - dedupes by `observed_at` with R2-preferred precedence by default
+  - returns v2 envelope + metadata (`source_mode`, `r2_coverage_end`, `ingest_tail_start`, `has_gap`, row counts)
+  - response headers include:
+    - `X-UK-AQ-Timeseries-Source-Mode`
+    - `X-UK-AQ-R2-Coverage-End`
+    - `X-UK-AQ-Ingest-Tail-Start`
+    - `X-UK-AQ-R2-Rows`
+    - `X-UK-AQ-Ingest-Rows`
+    - `X-UK-AQ-Has-Gap`
+    - `X-UK-AQ-Cache-Key-Version: ts-v2`
 - `/api/aq/stations-chart` -> `uk_aq_stations_chart`
 - `/api/aq/stations` -> `uk_aq_stations`
 - `/api/aq/la-hex` -> `uk_aq_la_hex`
@@ -56,15 +70,36 @@ Variables:
 - `UK_AQ_LATEST_SNAPSHOT_R2_API_URL`
 - `UK_AQ_POSTCODE_LOOKUP_R2_API_URL`
 - `UK_AQ_POSTCODE_SUGGEST_R2_API_URL`
+- `UK_AQ_OBSERVS_HISTORY_R2_API_URL`
 - `UK_AQ_CACHE_ALLOWED_ORIGINS`
 - `UK_AQ_CACHE_WORKER_NAME` (recommended; e.g. `uk-aq-cache-test` / `uk-aq-cache-live`)
 - `UK_AQ_EDGE_SESSION_MAX_AGE_SECONDS` (optional)
 - `UK_AQ_LOCAL_DEV_BYPASS_ENABLED` (optional; set `true`/`1` in test only, leave unset in live)
+- `UK_AQ_TIMESERIES_V2_ENABLED` (optional; defaults false)
+- `UK_AQ_TIMESERIES_PROXY_FIRST` (optional; defaults false)
+- `UK_AQ_TIMESERIES_R2_FIRST` (optional; defaults false)
+- `UK_AQ_TIMESERIES_ALLOW_INGEST_OVERWRITE` (optional; defaults false)
+- `UK_AQ_TIMESERIES_MAX_WINDOW_DAYS` (optional; default `90`)
+- `UK_AQ_TIMESERIES_MAX_R2_OBJECTS_PER_REQUEST` (optional; default `120`)
+- `UK_AQ_TIMESERIES_MAX_SUPABASE_TAIL_HOURS` (optional; default `168`)
+- `UK_AQ_TIMESERIES_INCREMENTAL_OVERLAP_MINUTES` (optional; default `180`)
+- `UK_AQ_TIMESERIES_PARTIAL_ON_R2_ERROR` (optional; default `true`)
+- `UK_AQ_TIMESERIES_PARTIAL_ON_INGEST_ERROR` (optional; default `false`)
+- `UK_AQ_TIMESERIES_RECENT_EDGE_TTL_SECONDS` (optional; default `60`)
+- `UK_AQ_TIMESERIES_RECENT_BROWSER_TTL_SECONDS` (optional; default `60`)
+- `UK_AQ_TIMESERIES_RECENT_SWR_SECONDS` (optional; default `60`)
+- `UK_AQ_TIMESERIES_HISTORICAL_EDGE_TTL_SECONDS` (optional; default `86400`)
+- `UK_AQ_TIMESERIES_HISTORICAL_BROWSER_TTL_SECONDS` (optional; default `86400`)
+- `UK_AQ_TIMESERIES_HISTORICAL_SWR_SECONDS` (optional; default `86400`)
+- `UK_AQ_TIMESERIES_STALE_IF_ERROR_SECONDS` (optional; default `300`)
+- `UK_AQ_TIMESERIES_R2_MANIFEST_URL` (optional diagnostics)
+- `UK_AQ_TIMESERIES_R2_INDEX_URL` (optional diagnostics)
 
 Secrets:
 
 - `UK_AQ_CACHE_CLOUDFLARE_API_TOKEN`
 - `SB_PUBLISHABLE_DEFAULT_KEY`
+- `SB_SECRET_KEY` (required for connector lookup in v2 stitch path)
 - `UK_AQ_EDGE_ACCESS_TOKEN_SECRET`
 - `UK_AQ_EDGE_UPSTREAM_SECRET`
 - `UK_AQ_CACHE_BYPASS_SECRET`
