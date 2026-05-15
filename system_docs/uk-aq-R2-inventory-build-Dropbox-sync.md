@@ -233,3 +233,73 @@ same size + same MD5/ETag = previous SHA-256 inventory entry is still valid
 ```
 
 Only changed or new objects need to be opened, hashed, and written into the refreshed inventory.
+
+
+
+
+
+Builder (31 min) — slower than I predicted
+The builder report shows perfect etag-skip:
+
+
+r2_md5_available_count: 4982     ← every entry got MD5 ✓
+reuse_by_r2_md5_size: 4982       ← every entry reused via strong path ✓
+manifests_reread: 0              ← nothing re-cat'd ✓
+metadata_warnings: []            ← --hash working correctly in GH ✓
+So the speedup we expected from etag-skip did happen. But the builder still took 31 min because of the elapsed_ms.days: 1349876 line — 22 minutes just doing rclone lsjson --recursive on the observations + aqilevels + core day prefixes.
+
+The reason: lsjson --recursive enumerates every object under those prefixes, including the parquet parts inside each day_utc=*/connector_id=*/ — thousands of files we then filter out in code with the DAY_MANIFEST_PATTERN regex. We only care about the day-level manifest.json (depth 2), but rclone is listing everything deeper.
+
+Cheap fix when you're rested: add --max-depth 2 to rcloneLsjsonRecursive when scanning day folders (it's depth 2: day_utc=*/manifest.json), and --max-depth 3 when scanning timeseries trees (day_utc=*/connector_id=*/manifest.json). Should chop builder time from 31 min to a few minutes. Not urgent.
+
+Sync (~61 min) — first-run cost from empty new checkpoint sections
+This is the real surprise. The new checkpoint has two new sections: index_files and index_tree_units. Your existing Dropbox checkpoint (from the old sync) only had domains.<name>.days[...]. So on this first run:
+
+The day comparisons all matched (same hash format as before) → ~0 day copies
+But all 4 index files + 3922 timeseries tree units were absent from the new checkpoint sections → every single one got queued for rclone copyto
+Each copyto does HEAD-source + HEAD-dest + hash compare (the --check-first flag) and skips the transfer when both sides match
+Even skipped copytos take ~1 sec round-trip (TLS setup, two HEADs)
+3926 × ~1 sec ≈ 65 min ≈ what you saw
+This is one-time. Tomorrow's run will see every one of those 3926 units in the checkpoint with matching hashes → it skips them entirely without invoking rclone at all. Expected sync time tomorrow: seconds.
+
+Tomorrow's run prediction
+Phase	First run (today)	Steady state (tomorrow)
+Builder	31 min	31 min (lsjson cost stays; optionally trim with --max-depth)
+Sync	61 min	< 1 minute (everything in checkpoint, no rclone copyto needed)
+Total	92 min	~31 min
+If you add --max-depth to the builder later, total drops to maybe 5-10 min. Without that optimization, steady state is ~31 min, which is fine for a daily 4:35 UTC cron — well under the 120-min workflow timeout.
+
+Daily task health
+Looking at the workflow steps: ✅ Build inventory completed → 🔄 Sync completed → ⏳ Upload artifacts → ⏳ Report daily task health (final). If it gets to the final health-report step and reports success, today counts as a healthy day in daily_task_runs. Worth verifying when you look tomorrow.
+
+Sleep well. The chart-gap diagnosis can wait.
+
+
+Files changed
+File	Change
+scripts/backup_r2/lib/rclone.mjs	rcloneLsjsonRecursive accepts maxDepth option; when > 0, passes --max-depth N to rclone. Default 0 = no cap (unchanged behavior for any other caller).
+scripts/backup_r2/build_backup_inventory.mjs	scanDayDomain passes maxDepth: 2; scanIndexTree passes maxDepth: 3.
+Why those depths
+Scan target	Path pattern	Depth
+Day manifests	<domain>/day_utc=*/manifest.json	2
+Tree units	<tree>/day_utc=*/connector_id=*/manifest.json	3
+Day-level scan was the slowest by far (22 min of the 31 min builder time) because history/v1/observations/ etc contain per-connector subfolders with parquet parts that rclone was enumerating for nothing — we were filtering them all out in code anyway. --max-depth 2 cuts the LIST to the day-manifest level only.
+
+Tree scan was already faster (8 min for 3922 entries because no parquet sibling noise) but --max-depth 3 makes its intent explicit and forecloses any future deeper junk.
+
+Predicted next-run timings
+Phase	Today (no depth cap)	Tomorrow (with cap + populated checkpoint)
+Builder	31 min	~5 min (day scan drops from 22 min to ~3 min; tree scan ~3 min; index files unchanged)
+Sync	~61 min (first-run from empty new checkpoint)	< 1 minute (everything in checkpoint, nothing to copy)
+Total	~92 min	~5-6 min
+That'll comfortably fit the daily cron window and the 120-min timeout with margin.
+
+About the timeout you're seeing now
+You're correct that this run timing out is OK. Three reasons:
+
+Sync writes the checkpoint after each successful unit copy. Whatever it managed to copy before getting killed is recorded.
+Next workflow run picks up where it stopped. All copied units skip, only the un-finished ones get attempted.
+One or two runs to converge. Even worst case, by the day after tomorrow it'll be fully steady-state.
+The report_daily_task_health step has if: always() so it'll still record this run's status (cancelled = failed) before the runner exits. So you'll see a "failed" entry in daily_task_runs for today — that's just a side effect of the migration cost; tomorrow's run should record ok.
+
+Sleep well — the chart-gap diagnostic is the only thing left in queue, and that's a 30-second DevTools check whenever you get back to it.
