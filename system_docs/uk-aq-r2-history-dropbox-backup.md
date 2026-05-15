@@ -61,7 +61,7 @@ Shape (abbreviated):
           "manifest_relative_path": "history/v1/observations/day_utc=2026-05-10/manifest.json",
           "manifest_hash": "<sha256 of manifest bytes>",
           "manifest_size": 12345,
-          "r2_etag": "<R2 MD5 etag>",
+          "r2_md5": "<R2 object MD5 etag>",
           "r2_modtime": "...",
           "file_count": 1,
           "total_bytes": 79927,
@@ -73,7 +73,7 @@ Shape (abbreviated):
     "core": { "days": {...} }
   },
   "index_files": {
-    "observations_latest": { "unit_type": "file", "relative_path": "...", "hash": "...", "size": N, "r2_etag": "...", "r2_modtime": "..." },
+    "observations_latest": { "unit_type": "file", "relative_path": "...", "hash": "...", "size": N, "r2_md5": "...", "r2_modtime": "..." },
     "aqilevels_latest": {...},
     "observations_timeseries_latest": {...},
     "aqilevels_timeseries_latest": {...}
@@ -90,15 +90,21 @@ Shape (abbreviated):
 }
 ```
 
-Hashes are SHA-256 of the exact JSON bytes as read from R2 — the same hash format the Dropbox checkpoint already records, so no migration was needed. The `r2_etag` + `r2_modtime` + size fields are kept so the next builder run can do its etag-skip comparison without re-reading every manifest.
+Hashes are SHA-256 of the exact JSON bytes as read from R2 — the same hash format the Dropbox checkpoint already records, so no migration was needed. The `r2_md5` + `r2_modtime` + size fields are kept so the next builder run can do its etag-skip comparison without re-reading every manifest.
 
 The JSON is written with deterministic key ordering (alphabetical at every level).
 
 ### Etag-skip mechanism
 
-For every R2 file the builder considers, it extracts `Size` and `Hashes.MD5` from `rclone lsjson` and compares against the previous inventory entry's stored values. If they match, the entry is reused verbatim — the manifest is not re-read.
+For every R2 file the builder considers, it extracts `Size` and `Hashes.md5` from `rclone lsjson` and compares against the previous inventory entry's stored values. If they match, the entry is reused verbatim — the manifest is not re-read.
 
-R2 normally exposes a real MD5 etag for single-part uploads, which is the strong case. If MD5 is missing (rclone backend quirk or multipart-style etag on a large file), the builder falls back to `Size + ModTime` and reports it under `metadata_warnings`. Modtime in R2 reflects upload time so it does change on rewrites, but it is weaker than MD5.
+> **Important:** rclone only exposes the R2 ETag/MD5 in `Hashes.md5` when called with `--hash --hash-type MD5`. Plain `rclone lsjson` (or `lsjson -M`) **omits** the hash — the field is silently absent and skip decisions degrade to Size + ModTime. The lsjson wrappers in `scripts/backup_r2/lib/rclone.mjs` (`rcloneLsjsonRecursive`, `rcloneLsjsonFile`) include these flags by default. Don't strip them.
+>
+> Verified behaviour:
+> - `rclone lsjson <object>` → no hash field
+> - `rclone lsjson --hash --hash-type MD5 <object>` → `"Hashes": { "md5": "71350ccf…" }` (matches AWS S3 `head-object` ETag)
+
+If MD5 is still missing after that (e.g. multipart-style composite etag, or a future backend regression), the builder falls back to `Size + ModTime` for the skip decision and reports the count under `md5_missing_count` + `metadata_warnings`. Modtime reflects upload time so it does change on rewrites, but is weaker than a real MD5.
 
 The first build is unavoidably slow (full scan of every manifest). Steady-state runs are near-instant.
 
@@ -228,20 +234,32 @@ Behaviour:
 - `lib/rclone.mjs` — rclone wrappers (`runRclone`, `rcloneCatMaybe`, `rcloneCat`, `rcloneLsjsonRecursive`, `rcloneLsjsonFile`, `uploadFromTempFile`), `sha256Hex`, `joinTargetPath`, `normalizePrefix`. Single source of truth for shell invocation shape and not-found detection.
 - `lib/inventory.mjs` — schema constants (`INVENTORY_SCHEMA_VERSION`, `INVENTORY_KIND`, `DOMAIN_NAMES`, `INDEX_FILE_KEYS`, `INDEX_TREE_KEYS`, `DEFAULT_INVENTORY_REL_PATH`) and `loadInventory(rcloneBin, sourceRoot, relPath, { strict })`. `strict: true` is used by sync (fails loudly); `strict: false` is used by the builder when reading the previous inventory.
 
-## Workflow
+## Workflows
 
-GitHub workflow:
+Daily backup (build inventory + sync):
 
 - `.github/workflows/uk_aq_r2_history_dropbox_backup.yml`
+- Runs the builder step (writes/refreshes the inventory) followed by the sync step in the same job, sharing the rclone config.
+- Intended schedule: `04:35 UTC` daily via external Cloudflare Worker scheduler (`workflow_dispatch`). Previous GitHub cron: `35 4 * * *`.
+- `timeout-minutes: 120`.
+- Workflow dispatch inputs:
+  - `dry_run` — passes `--dry-run` to the sync (the builder still runs and writes the inventory; the inventory is small idempotent control metadata, and the sync's dry-run plan needs a fresh inventory to be accurate).
+  - `max_days_per_run` — overrides the `UK_AQ_R2_HISTORY_BACKUP_MAX_DAYS_PER_RUN` cap on the sync's day-folder copies.
+
+Initial build (manual, build-only):
+
+- `.github/workflows/uk_aq_r2_initial_build_inventory.yml`
+- Manual `workflow_dispatch` only — no cron.
+- Runs **only** the builder step (no sync, no Dropbox config).
+- `timeout-minutes: 240` to comfortably cover a cold first-build on a large bucket (e.g. LIVE bootstrap).
+- Workflow dispatch inputs:
+  - `full_rebuild` — passes `--full-rebuild` to ignore the previous inventory and re-read every manifest.
+- Use this for the LIVE bootstrap (run it once, then rely on the daily workflow), or as a recovery tool if the inventory ever goes missing/invalid.
+- Shares the same concurrency group as the daily backup so the two can't race.
 
 Restore workflow (manual):
 
 - `.github/workflows/uk_aq_r2_history_restore_from_dropbox.yml`
-
-Intended schedule:
-
-- `04:35 UTC` daily via external Cloudflare Worker scheduler (`workflow_dispatch`).
-- Previous GitHub cron: `35 4 * * *` (UTC).
 
 Core snapshot workflow (R2 write):
 
@@ -253,13 +271,6 @@ Core snapshot workflow (R2 write):
   - `history/v1/core/day_utc=YYYY-MM-DD/manifest.json`
   - `history/v1/core/day_utc=YYYY-MM-DD/checksums.sha256`
   - `history/v1/core/day_utc=YYYY-MM-DD/table=<table>/rows.ndjson.gz`
-
-> **Workflow update pending.** The workflow still invokes only `sync_history_to_dropbox.mjs`. Until a builder step is added (a separate scheduled task), the sync step will fail with the "inventory not found" error unless the inventory has been built recently by hand. Plan: add a `node scripts/backup_r2/build_backup_inventory.mjs --source-root ...` step immediately before the sync step, sharing the same job and rclone config.
-
-Workflow dispatch inputs:
-
-- `dry_run` — passes `--dry-run` to the sync (still triggers the build step).
-- `max_days_per_run` — overrides the `UK_AQ_R2_HISTORY_BACKUP_MAX_DAYS_PER_RUN` cap.
 
 ## Required GitHub values
 
@@ -358,9 +369,12 @@ Builder writes a JSON report to `--report-out` (also echoed to stdout).
 | `manifests_reread` | Manifests that needed a fresh `rclone cat` (etag-skip miss) |
 | `etag_skip_hits` | Manifests reused verbatim from the previous inventory |
 | `etag_skip_rate` | `1 - manifests_reread/manifests_listed` |
-| `etag_metadata_available` | `true` only when every entry had a real MD5 etag |
-| `metadata_source_counts` | Breakdown: `etag_md5`, `modtime_fallback`, `size_only`, `missing` |
-| `metadata_warnings` | Human-readable warnings if any non-MD5 fallbacks happened |
+| `md5_available_count` | LSJSON entries whose `Hashes.md5` was present (the strong-signal path) |
+| `md5_missing_count` | LSJSON entries with no `Hashes.md5` — these fall back to Size + ModTime for skip decisions |
+| `reuse_by_md5_size` | Skip-hits decided by Size + MD5 match |
+| `reuse_by_size_modtime` | Skip-hits decided by Size + ModTime fallback (only when MD5 was missing on either side) |
+| `md5_metadata_available` | `true` iff every entry had MD5 (i.e. `md5_missing_count == 0`) |
+| `metadata_warnings` | Human-readable warnings — non-empty if `md5_missing_count > 0` |
 | `index_files_listed/reread/skipped/missing` | Same as manifests, for the four `*_latest.json` files |
 | `index_tree_units_listed/reread/skipped` | Same as manifests, for per-`(day, connector)` tree units |
 | `elapsed_ms.{days,index_files,index_trees,total}` | Per-phase timings |
