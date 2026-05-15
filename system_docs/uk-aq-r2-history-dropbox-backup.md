@@ -366,19 +366,22 @@ Builder writes a JSON report to `--report-out` (also echoed to stdout).
 | `inventory_hash` | SHA-256 of the deterministic JSON inventory just written |
 | `inventory_size` | Bytes |
 | `manifests_listed` | Day manifests R2 LIST returned |
-| `manifests_reread` | Manifests that needed a fresh `rclone cat` (etag-skip miss) |
-| `etag_skip_hits` | Manifests reused verbatim from the previous inventory |
-| `etag_skip_rate` | `1 - manifests_reread/manifests_listed` |
-| `md5_available_count` | LSJSON entries whose `Hashes.md5` was present (the strong-signal path) |
-| `md5_missing_count` | LSJSON entries with no `Hashes.md5` — these fall back to Size + ModTime for skip decisions |
-| `reuse_by_md5_size` | Skip-hits decided by Size + MD5 match |
+| `manifests_reread` | Day manifests that needed a fresh `rclone cat` (skip miss) |
+| `manifest_reuse_rate` | `1 - manifests_reread / manifests_listed` (day-manifest skip-hit rate; null if listed=0) |
+| `reread_new_or_changed` | Total re-reads (across all categories) where the previous inventory entry didn't exist or its signal didn't match. Zero when `--full-rebuild` is set. |
+| `reread_full_rebuild` | Total re-reads (across all categories) forced by the `--full-rebuild` flag. Zero when the flag is not set. |
+| `index_files_listed/reread/skipped/missing` | Per-category counters for the four `*_latest.json` files |
+| `index_tree_units_listed/reread/skipped` | Per-category counters for per-`(day, connector)` tree units |
+| `r2_md5_available_count` | LSJSON entries (across all categories) whose `Hashes.md5` was present — the strong-signal skip path |
+| `r2_md5_missing_count` | LSJSON entries with no `Hashes.md5` — those entries fall back to Size + ModTime for skip decisions |
+| `r2_md5_metadata_available` | `true` iff every entry had MD5 (i.e. `r2_md5_missing_count == 0`) |
+| `reuse_by_r2_md5_size` | Skip-hits (across all categories) decided by Size + MD5 match (the strong path) |
 | `reuse_by_size_modtime` | Skip-hits decided by Size + ModTime fallback (only when MD5 was missing on either side) |
-| `md5_metadata_available` | `true` iff every entry had MD5 (i.e. `md5_missing_count == 0`) |
-| `metadata_warnings` | Human-readable warnings — non-empty if `md5_missing_count > 0` |
-| `index_files_listed/reread/skipped/missing` | Same as manifests, for the four `*_latest.json` files |
-| `index_tree_units_listed/reread/skipped` | Same as manifests, for per-`(day, connector)` tree units |
+| `metadata_warnings` | Human-readable warnings — non-empty if `r2_md5_missing_count > 0` |
 | `elapsed_ms.{days,index_files,index_trees,total}` | Per-phase timings |
 | `summary.domain_day_count` | Total days per domain currently in inventory |
+
+> Total reuse hits across all categories = `reuse_by_r2_md5_size + reuse_by_size_modtime`. There's no separate aggregate counter — sum the two if you need it.
 
 ### Report fields — sync
 
