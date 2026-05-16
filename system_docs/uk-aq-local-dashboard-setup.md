@@ -156,6 +156,49 @@ curl -s http://127.0.0.1:8001/assets/config.js | head
 
 ---
 
+## Dashboard Data Sources (what powers each panel)
+
+This section describes where each panel on `dashboard/index.html` gets its data when running the local Python backend.
+
+### Main API routes used by the dashboard page
+
+- `GET /api/dashboard` -> main payload for connector settings, dispatcher feed, pollutant freshness, DB-size trend, and related metadata.
+- `GET /api/storage_coverage` -> storage-coverage calendar payload.
+- `GET /api/r2_metrics` -> on-demand R2 usage/limits refresh (used by the "Refresh R2 metrics" button).
+- `GET /api/r2_connector_counts` -> R2 connector/day-count charts inside the storage-coverage panel.
+- `POST /api/connectors` -> saves connector polling settings edits from the dashboard UI.
+- `POST /api/dispatcher_settings` -> saves dispatcher settings edits from the dashboard UI.
+
+### Panel-by-panel source summary
+
+| Dashboard section | API route | Backend source tables/views/RPC/API |
+|---|---|---|
+| Connector Settings table | `/api/dashboard` (read), `/api/connectors` (write) | `uk_aq_core.connectors` via PostgREST `connectors` |
+| Dispatcher Settings panel | `/api/dashboard` (read), `/api/dispatcher_settings` (write) | `uk_aq_core.dispatcher_settings` via PostgREST `dispatcher_settings` |
+| Dispatcher Feed table | `/api/dashboard` | `uk_aq_core.uk_aq_ingest_runs` view/table (`/uk_aq_ingest_runs`) plus synthetic in-flight rows derived from `connectors.last_run_start/last_run_end` |
+| PM2.5 / PM10 / NO2 freshness tables | `/api/dashboard` | `uk_aq_core.timeseries` (`last_value`, `last_value_at`, station/connector IDs) plus `phenomena`; connector metadata from `connectors`; station metadata from `stations` + `station_metadata` |
+| DB Size Trend (line + stacked charts) | `/api/dashboard` | Primary: external DB-size metrics API (`UK_AQ_DB_SIZE_API_URL`) returning `db_size_metrics`, `schema_size_metrics`, `r2_domain_size_metrics`; fallback/top-up: Supabase views `uk_aq_db_size_metrics_hourly`, `uk_aq_schema_size_metrics_hourly`, `uk_aq_r2_domain_size_metrics_hourly` |
+| R2 usage bars + free-tier percentages | `/api/dashboard`, `/api/r2_metrics` | Cloudflare account metrics API calls in backend (`_fetch_r2_account_metrics`) using R2/Cloudflare account token env vars |
+| R2 history window label | `/api/dashboard`, `/api/r2_metrics` | Preferred: external history-days API (`UK_AQ_R2_HISTORY_DAYS_API_URL`); fallback: Supabase RPC `uk_aq_rpc_r2_history_days_by_domain`; additional fallback range RPC `uk_aq_rpc_r2_history_window` |
+| Storage Coverage calendar | `/api/storage_coverage` (also optionally embedded in `/api/dashboard`) | Ingest day presence: ingestdb RPC `uk_aq_rpc_observations_hourly_fingerprint`; OBS/AQI day presence: obs_aqidb view `uk_aq_obs_aqidb_day_counts_current` (with RPC fallbacks); R2 day presence: external history-days API (or fallback `uk_aq_rpc_r2_history_days_by_domain`); Dropbox backup days: local/remote Dropbox checkpoint JSON |
+| Storage Coverage R2 connector counts cards | `/api/r2_connector_counts` | External R2 history-counts API (`UK_AQ_R2_HISTORY_COUNTS_API_URL`) |
+
+### How "Active" is determined in pollutant tables
+
+The `Active` column in PM2.5/PM10/NO2 tables is computed from station status logic in `uk_aq_dashboard_api.py`:
+
+- A station is **inactive** if `stations.removed_at` is not null.
+- For most connectors, a non-removed station is treated as **active**.
+- Special case for Breathe London primary rows (`connector_code == breathelondon` and `service_ref == breathelondon`):
+  active requires truthy `station_metadata.attributes.enabled` **or** truthy `station_metadata.attributes.site_active`.
+- `Active` counts only stations that both:
+  - satisfy the active rule above, and
+  - have at least one matching pollutant timeseries with non-null `last_value` and `last_value_at`.
+
+Freshness buckets (`0-3`, `3-6`, `6-24`, `1-7`, `7+`) are based on `timeseries.last_value_at` recency.
+
+---
+
 ## Cloudflare Access Session Expiry Recovery
 
 - Dashboard API fetches (`/api/dashboard`, `/api/storage_coverage`) can fail with browser
