@@ -106,7 +106,20 @@ For every R2 file the builder considers, it extracts `Size` and `Hashes.md5` fro
 
 If MD5 is still missing after that (e.g. multipart-style composite etag, or a future backend regression), the builder falls back to `Size + ModTime` for the skip decision and reports the count under `md5_missing_count` + `metadata_warnings`. Modtime reflects upload time so it does change on rewrites, but is weaker than a real MD5.
 
-The first build is unavoidably slow (full scan of every manifest). Steady-state runs are near-instant.
+The first build is unavoidably slow (full scan of every manifest). Steady-state runs are near-instant — **provided the upstream index rebuilder keeps tree-unit manifests byte-stable when underlying data hasn't changed.** See the next section.
+
+### Upstream coordination — index rebuilder idempotency
+
+The R2 history index rebuilder ([workers/shared/uk_aq_r2_history_index.mjs](../workers/shared/uk_aq_r2_history_index.mjs)) is invoked by `uk_aq_prune_daily` (Cloud Run, 02:00 UTC daily) after every successful Phase B run. It rewrites the per-`(day, connector)` tree-unit manifests under `history/_index/{observations,aqilevels}_timeseries/` so they stay consistent with the parquets they index.
+
+Two properties of the rebuilder make our daily backup fast:
+
+1. **Data-driven `generated_at`.** Tree-unit manifest payloads use the source connector manifest's `backed_up_at_utc` for `generated_at`, not wall-clock. When the source data didn't change, the payload bytes are identical run-to-run, so R2's MD5 etag stays stable and our `lsjson --hash` skip works.
+2. **Idempotent PUTs.** Every PUT in the rebuilder goes through `r2PutObjectIfChanged`: HEAD the existing object, MD5-compare against the new body, **skip the PUT entirely** when bytes match. Saves R2 PUT operations upstream and guarantees that nothing changes downstream when content didn't actually change. Rebuilder result objects include `put_skipped: true/false` per unit for observability.
+
+Together these mean **only the days that genuinely received new data churn each cycle** — typically ~4 tree units (one per connector for "yesterday's" day), not ~4000. The backup builder re-cats only those few; the sync copytos only those few.
+
+If you ever see tree units re-read en masse despite no source-data change, check whether the rebuilder is running an old (pre-A.3/B) build of `uk_aq_r2_history_index.mjs` in the deployed `uk_aq_prune_daily` Cloud Run service.
 
 ## Layout
 
@@ -226,12 +239,12 @@ Behaviour:
 3. **Plan days** per domain: for each day in inventory, compare `manifest_hash` against checkpoint's stored hash. Mismatch → queue. Apply `--max-days-per-run` per domain.
 4. **Plan index files**: same hash compare for each of the four `*_latest.json` files.
 5. **Plan index tree units**: same hash compare for each per-`(day, connector)` manifest.
-6. **Copy** queued units (`rclone copy` for day folders, `rclone copyto` for single files). On each successful copy, update the checkpoint section and rewrite the checkpoint.
+6. **Copy** queued units (`rclone copy` for day folders, `rclone copyto` for single files). Dropbox `too_many_write_operations` responses are retried with exponential backoff before the unit is treated as failed. On each successful copy, update the checkpoint section and rewrite the checkpoint.
 7. **No deletion propagation**: units in the checkpoint but absent from the inventory are ignored; nothing is removed from Dropbox.
 
 ### Shared library — `scripts/backup_r2/lib/`
 
-- `lib/rclone.mjs` — rclone wrappers (`runRclone`, `rcloneCatMaybe`, `rcloneCat`, `rcloneLsjsonRecursive`, `rcloneLsjsonFile`, `uploadFromTempFile`), `sha256Hex`, `joinTargetPath`, `normalizePrefix`. Single source of truth for shell invocation shape and not-found detection.
+- `lib/rclone.mjs` — rclone wrappers (`runRclone`, `runRcloneWithRetry`, `rcloneCatMaybe`, `rcloneCat`, `rcloneLsjsonRecursive`, `rcloneLsjsonFile`, `uploadFromTempFile`), `sha256Hex`, `joinTargetPath`, `normalizePrefix`. Single source of truth for shell invocation shape and not-found detection.
 - `lib/inventory.mjs` — schema constants (`INVENTORY_SCHEMA_VERSION`, `INVENTORY_KIND`, `DOMAIN_NAMES`, `INDEX_FILE_KEYS`, `INDEX_TREE_KEYS`, `DEFAULT_INVENTORY_REL_PATH`) and `loadInventory(rcloneBin, sourceRoot, relPath, { strict })`. `strict: true` is used by sync (fails loudly); `strict: false` is used by the builder when reading the previous inventory.
 
 ## Workflows
@@ -416,6 +429,8 @@ If a day was rewritten in R2 between runs, you'll see `copied_days >= 1` and the
 | Sync exits with "inventory has unexpected kind=..." | Wrong file at the inventory path | Move/delete that file, then re-run the builder |
 | Sync exits with "inventory has version=..." | Schema bump | Re-run builder (matching version is `1`) |
 | Builder report `metadata_warnings` non-empty | rclone/R2 didn't expose MD5 etag for some entries | Etag-skip degraded to ModTime fallback; investigate rclone backend version |
+| Builder re-reads thousands of tree units daily despite no source-data change | Upstream `uk_aq_r2_history_index.mjs` deployed without A.3/B idempotency (data-driven `generated_at` + `r2PutObjectIfChanged`) | Re-deploy `uk_aq_prune_daily` Cloud Run with the current shared module; confirm rebuilder result objects include `put_skipped` |
+| Sync copies thousands of tree units daily despite no source-data change | Same upstream cause as above (tree-unit bytes changing daily ⇒ checkpoint hash always differs from inventory hash) | Same fix as above |
 
 ## Restore (Dropbox → R2 History)
 

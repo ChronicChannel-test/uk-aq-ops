@@ -325,3 +325,55 @@ New: nothing (no R2 changes overnight, just steady-state daily delta)
 So I'd expect 5-15 minutes for sync today. Tomorrow it'll be seconds.
 
 Total today: builder 10 min + sync ~10 min = ~20 min. Well inside the 120-min budget.
+
+
+
+"Does A.3 alone speed up the build?"
+Yes — A.3 alone fixes both our builder and our sync. No need for the idempotency check just to fix our pipeline.
+
+Reasoning: A.3 ties the manifest's generated_at to the source data's latest observed timestamp instead of Date.now(). For a day where no new data arrived, the payload bytes come out identical run-to-run → MD5 identical → both our etag-skip (builder) and our hash-skip (sync) work. The fact that prune-daily still PUTs the identical bytes is wasted R2 work but doesn't affect us — R2 just writes the same bytes with the same etag, our LIST sees no change.
+
+The idempotency check (B) is bonus: it skips the wasted PUTs upstream. Saves R2 write costs and reduces the chance of any subtle R2 mtime bumps. Worth adding, not required for our pipeline.
+
+Fix	Builder daily	Sync daily	R2 PUTs daily
+Today (neither)	~48 min	~65 min	~3930 wasted PUTs
+A.3 alone	~3 min	<1 min	Still ~3930 wasted PUTs
+A.3 + B	~3 min	<1 min	Only the ~5-10 that genuinely changed
+"Do we still have a way of showing when they were generated?"
+Yes, in three places that don't pollute the hashable payload:
+
+R2 object's last_modified (visible via S3 HEAD/LIST or rclone lsjson). Shows real wall-clock time of the last PUT regardless of content.
+Prune-daily structured log (server.mjs:1930) — phase_b_history_index_rebuild_complete entries with timestamps.
+Workflow run history in Cloud Scheduler / GH Actions.
+If you want the timestamp INSIDE the JSON for human readability, a cleaner pattern: keep generated_at as an informational field but exclude it from the hashable payload. The hash is data-driven; the timestamp is metadata. Requires withManifestHash to skip generated_at when computing the hash. Slightly more code than A.3 but preserves the audit field.
+
+"What are the tree-unit manifests for?"
+They're per-(day, connector) lookup indexes. One file at:
+
+
+history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=N/manifest.json
+Each contains:
+
+Field	Purpose
+day_utc, connector_id	Identity
+connector_manifest_key + connector_manifest_hash	Pointer back to the source day-connector manifest
+source_row_count, total_bytes	Aggregate metrics
+timeseries_row_counts: {ts_id: N, ...}	The key payload — per-timeseries row counts for this day/connector
+parquet_object_keys, files[] with min/max_timeseries_id, min/max_observed_at	File ranges so a consumer knows which parquet parts contain which timeseries IDs
+Consumers:
+
+uk_aq_observs_history_r2_api_worker — the R2 API the cache_proxy v2 stitcher calls. Uses these to know which parquet parts to fetch for a given timeseries_id without parsing all parquets.
+uk_aq_history_integrity tool — compares per-timeseries row counts against authoritative source counts.
+AQI history workers — same pattern for the aqilevels equivalent.
+In short: they're query-acceleration indexes. Reading them is much cheaper than scanning parquet metadata to figure out "which file has timeseries 3742 for day 2026-05-10?". That's why they get rebuilt after every Phase B (to stay consistent with the parquets they index).
+
+The unconditional rewrite is what's wasteful — the re-derivation is correct, but writing identical bytes back to R2 is just adding noise. A.3 fixes that.
+
+My recommendation
+Implement A.3 only. Smallest, sufficient. Touch every generated_at: ...new Date().toISOString() in the rebuilder and replace with a data-driven value (use max_observed_at for day/tree manifests; for the four *_latest.json index files, use the latest max_observed_at across the domain). If you want B as well later, easy add — but not needed first.
+
+Want me to draft the patch?
+
+Ah if B also saves writes costs, that's worth doing. 
+Can you implement A.3 + B please.
+

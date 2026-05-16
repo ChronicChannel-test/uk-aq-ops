@@ -68,6 +68,7 @@ system doc.
   - The slow scan only fires once (first build) and for changed entries thereafter.
 - `scripts/backup_r2/sync_history_to_dropbox.mjs`
   - Reads the inventory, compares hashes to the Dropbox checkpoint, copies only changed/missing units.
+  - Retries Dropbox write-rate throttle errors (`too_many_write_operations`) with exponential backoff before failing the run.
   - Fails loudly if the inventory is missing/invalid; no fallback to direct scan.
 - `scripts/backup_r2/lib/`
   - `rclone.mjs` shared rclone wrappers + sha256 + path helpers.
