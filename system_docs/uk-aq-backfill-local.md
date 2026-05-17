@@ -104,8 +104,20 @@ For each `(day_utc, connector_id)`:
 7. Upload merged connector outputs to live R2 (replace connector/day objects).
 8. Rebuild day-level manifests from connector manifests.
 
-If local Dropbox baseline manifests are missing for targeted merge,
-backfill fails that connector/day to avoid destructive partial rewrite.
+### No-data tolerance
+
+The `source_to_r2` path has two "missing data" branches that used to fail and now write the manifest anyway. Both are intentional, both apply only to OpenAQ today.
+
+1. **Source genuinely has no data** (OpenAQ S3 returned `found:false` for every candidate location, `locationFilesFound === 0`). Treated as *authoritative-no-data*: writes an empty connector manifest (`file_count: 0`, `source_row_count: 0`, `files: []`) and the corresponding day manifest, instead of skipping. Distinguished from transport errors by the explicit per-location outcome counters (`found / missing / error`); transport errors still propagate and abort the chunk. Logged via `source_to_r2_openaq_empty_manifest_written` and `source_to_r2_openaq_no_data_classification` with `class: "authoritative_no_data" | "transport_error" | "metadata_mismatch"`. The classification is persisted in the ledger checkpoint as `no_data_classification`.
+
+2. **Targeted merge has no local-history baseline** (`loadObsRowsForConnectorDayFromLocalHistory` and/or its AQI counterpart returned null — typical for days the original ingest missed). Treated as *no preservation needed*: continues with `preservedObsRows = []`, writes only the replacement rows for the targeted timeseries as a fresh connector + day manifest. Logged via `source_to_r2_targeted_merge_no_local_history` and recorded in the ledger checkpoint as `targeted_local_history_missing: true`.
+
+Metadata-mismatch skips remain skips (no manifest written) — these are configuration errors, not no-data:
+
+- `no_matching_requested_timeseries_ids` — requested IDs don't exist in the connector lookup
+- `no_matching_location_ids_after_timeseries_filter` — requested IDs map to no OpenAQ locations
+
+Adapters other than OpenAQ keep the original skip-on-no-data behaviour; extend per-adapter as needed.
 
 ## AQI handling / output scope
 

@@ -390,3 +390,18 @@ Changed days	Sync time
 200+ (mass rewrite)	10+ min
 So yes — if you do something that touches lots of days (big backfill, schema migration), sync goes from 2.5s into the minutes-range, and could even rival the inventory step. For normal day-to-day operation it'll stay well under a minute.
 
+
+
+Step	Where	What it produces	When it runs
+Index build (was broken)	uk_aq_prune_daily Cloud Run, after Phase B writes manifests	history/_index/* — root index files + per-(day, connector) tree units in R2	Daily, as part of prune
+Inventory build (innocent observer)	Dropbox backup workflow (scheduled + manual)	history/_index/backup_inventory_v1.json — fingerprint map to drive sync	Each scheduled or manual sync
+You're spot on: the index build reflects R2 data after Phase B has updated it, so the index adds new info on top of the freshly-written manifests. The inventory build never touches that — it just observes what's in R2 to decide what needs syncing to Dropbox.
+
+One small footnote (not relevant for the fix, just so you know): the same rebuildR2HistoryIndexes function can also be invoked manually via scripts/backup_r2/uk_aq_build_r2_history_index.mjs. So if you ever want to force an index rebuild outside the prune schedule, that's the lever. Same code path, same fix benefit once it's on the latest shared module.
+
+When you're ready to test the fix:
+
+Wait for/trigger the prune deploy
+Wait for/trigger prune to run
+rclone cat ... on the same January-1 tree unit and check both timestamps now match the March value
+

@@ -110,16 +110,34 @@ The first build is unavoidably slow (full scan of every manifest). Steady-state 
 
 ### Upstream coordination — index rebuilder idempotency
 
-The R2 history index rebuilder ([workers/shared/uk_aq_r2_history_index.mjs](../workers/shared/uk_aq_r2_history_index.mjs)) is invoked by `uk_aq_prune_daily` (Cloud Run, 02:00 UTC daily) after every successful Phase B run. It rewrites the per-`(day, connector)` tree-unit manifests under `history/_index/{observations,aqilevels}_timeseries/` so they stay consistent with the parquets they index.
+The R2 history index rebuilder ([workers/shared/uk_aq_r2_history_index.mjs](../workers/shared/uk_aq_r2_history_index.mjs)) is invoked by `uk_aq_prune_daily` (Cloud Run, 02:00 UTC daily) after every successful Phase B run. It rewrites:
+- per-`(day, connector)` tree-unit manifests under `history/_index/{observations,aqilevels}_timeseries/day_utc=…/connector_id=…/manifest.json`
+- the four aggregate root index files: `history/_index/{observations,aqilevels}.json` and `history/_index/{observations,aqilevels}_timeseries_latest.json`
 
-Two properties of the rebuilder make our daily backup fast:
+This is a different "build" from the **inventory build** that runs inside the Dropbox backup workflow itself — the index rebuild produces R2 objects; the inventory build observes them. They share no code path. If you're confused which one is misbehaving, look at the output path: `_index/*` = index rebuild (in prune); `_index/backup_inventory_v1.json` = inventory build (in Dropbox backup workflow).
 
-1. **Data-driven `generated_at`.** Tree-unit manifest payloads use the source connector manifest's `backed_up_at_utc` for `generated_at`, not wall-clock. When the source data didn't change, the payload bytes are identical run-to-run, so R2's MD5 etag stays stable and our `lsjson --hash` skip works.
-2. **Idempotent PUTs.** Every PUT in the rebuilder goes through `r2PutObjectIfChanged`: HEAD the existing object, MD5-compare against the new body, **skip the PUT entirely** when bytes match. Saves R2 PUT operations upstream and guarantees that nothing changes downstream when content didn't actually change. Rebuilder result objects include `put_skipped: true/false` per unit for observability.
+Three properties of the rebuilder make our daily backup fast:
+
+1. **Data-driven `generated_at` on tree units.** Tree-unit manifest payloads use the source connector manifest's `backed_up_at_utc` for `generated_at`, not wall-clock. When the source data didn't change, the payload bytes are identical run-to-run, so R2's MD5 etag stays stable and our `lsjson --hash` skip works.
+2. **Data-driven `generated_at` on root index files.** The four aggregate `*.json` and `*_timeseries_latest.json` files derive `generated_at` from `max(daySummaries[*].backed_up_at_utc)` (or, for the timeseries-latest files, from `max(connector_indexes[*].backed_up_at_utc)` across all day summaries). Same byte-stability property — these files don't churn just because the rebuilder ran. Caller-supplied `generatedAt` is the fallback only when no source has any timestamp.
+3. **Idempotent PUTs.** Every PUT in the rebuilder goes through `r2PutObjectIfChanged`: HEAD the existing object, MD5-compare against the new body, **skip the PUT entirely** when bytes match. Saves R2 PUT operations upstream and guarantees that nothing changes downstream when content didn't actually change. Rebuilder result objects include `put_skipped: true/false` per unit for observability.
 
 Together these mean **only the days that genuinely received new data churn each cycle** — typically ~4 tree units (one per connector for "yesterday's" day), not ~4000. The backup builder re-cats only those few; the sync copytos only those few.
 
-If you ever see tree units re-read en masse despite no source-data change, check whether the rebuilder is running an old (pre-A.3/B) build of `uk_aq_r2_history_index.mjs` in the deployed `uk_aq_prune_daily` Cloud Run service.
+If you ever see tree units re-read en masse despite no source-data change, run `rclone cat <tree_unit_manifest> | jq '.generated_at, .backed_up_at_utc'` on a known-stable (day, connector). Both fields should match (both data-driven from the source). If `generated_at` is a recent wall-clock and `backed_up_at_utc` is older, the deployed `uk_aq_prune_daily` Cloud Run service is running pre-data-driven code — see the deploy gotcha below.
+
+### Deploy gotcha — shared module paths in CI
+
+`uk_aq_prune_daily` imports `rebuildR2HistoryIndexes` from `workers/shared/uk_aq_r2_history_index.mjs` (and several other shared modules). The deploy workflow at [`.github/workflows/uk_aq_prune_daily_cloud_run_deploy.yml`](../.github/workflows/uk_aq_prune_daily_cloud_run_deploy.yml) only redeploys when files in its `paths:` filter change. **Shared modules must be listed explicitly** — otherwise a change to the shared library lands on `main` but Cloud Run keeps running the old code.
+
+Same pattern applies to every deploy workflow that builds a worker importing from `workers/shared/`:
+- `uk_aq_db_r2_metrics_api_worker_deploy.yml` (also imports `uk_aq_r2_history_index.mjs`)
+- `uk_aq_db_size_logger_cloud_run_deploy.yml`
+- `uk_aq_observs_partition_maintenance_cloud_run_deploy.yml`
+- `uk_aq_postcode_lookup_r2_api_worker_deploy.yml`
+- `uk_aq_supabase_db_dump_backup_service_deploy.yml`
+
+If you add a new worker that imports from `workers/shared/`, add each imported file to that worker's deploy `paths:` filter. Don't use a wildcard (`workers/shared/**`) — it causes spurious deploys when unrelated shared modules change.
 
 ## Layout
 
