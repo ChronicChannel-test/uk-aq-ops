@@ -760,12 +760,13 @@ internally normalising to a list.
 
 ### Recoverable no-data scenarios
 
-Two "no data" cases that integrity used to surface as backfill failures now succeed by writing the manifest the integrity check would otherwise re-discover as missing:
+Three no-data cases that integrity used to surface as backfill failures now succeed by writing the manifest the integrity check would otherwise re-discover as missing:
 
 1. **OpenAQ S3 has no records for the requested day/connector.** Backfill writes an empty connector + day manifest; subsequent integrity cross-checks for that day stop flagging `r2_manifest_missing`.
 2. **Targeted-merge run for a day that has no existing local Dropbox baseline** (e.g., a day the original ingest never touched). Backfill writes a fresh connector + day manifest containing just the replacement rows for the targeted timeseries IDs (no preservation needed because there's nothing to preserve).
+3. **Sensor.Community daily archive has no day source files** (including missing day index at `https://archive.sensor.community/YYYY-MM-DD/`). Backfill writes an empty connector + day manifest instead of skipping.
 
-Both behaviours are OpenAQ-only today. See [uk-aq-backfill-local.md → No-data tolerance](uk-aq-backfill-local.md#no-data-tolerance) for the runner-side mechanics, log event names, and ledger fields.
+See [uk-aq-backfill-local.md → No-data tolerance](uk-aq-backfill-local.md#no-data-tolerance) for the runner-side mechanics, log event names, and ledger fields.
 
 If a chunk fails with `source_to_r2 encountered N connector-day errors` and the per-chunk Deno log includes `source_to_r2 targeted merge requires local Dropbox history manifests`, the running `run_job.ts` predates that fix — check the file at `UK_AQ_BACKFILL_RUN_JOB_PATH`.
 
@@ -1302,6 +1303,9 @@ Delivered:
   `UK_AQ_HISTORY_INTEGRITY_SENSOR_COMMUNITY_BASE_URL`). One index fetch
   per day; the HTML is parsed with a single regex over
   `<a href="<YYYY-MM-DD>_<sensor_type>_sensor_<sensor_id>.csv">`.
+  The fetch now uses the shared HTTP retry/backoff policy (3 attempts),
+  including retries for transient partial-read/connection-close failures
+  (for example `IncompleteRead` / `RemoteDisconnected`).
 - Per-sensor workflow mirrors the OpenAQ adapter:
   - sensors absent from the day's index are recorded as missing
     (no per-file HEAD; saves round trips)
