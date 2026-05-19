@@ -228,6 +228,35 @@ Additional vars are required conditionally by preflight, for example:
 
 - `UK_AQ_R2_HISTORY_DROPBOX_ROOT` when cross-check is enabled (default).
 - `UK_AQ_BACKFILL_WRAPPER` + `UK_AQ_BACKFILL_ENV_FILE` when `--run-backfill` is set.
+- `UK_AQ_BACKFILL_ENV_FILE` + `OBS_AQIDB_SUPABASE_URL` + `OBS_AQIDB_SECRET_KEY`
+  (loaded from that file) when daily task health reporting is enabled.
+- `UK_AQ_HISTORY_INTEGRITY_DAILY_TASK_HEALTH_ENABLED` (default `true`) and
+  `UK_AQ_HISTORY_INTEGRITY_DAILY_TASK_HEALTH_STRICT` (default `false`) control
+  daily task health reporting behavior.
+
+### Daily task health reporting
+
+When enabled, each integrity run reports to Obs AQI DB daily task health:
+
+- `task_key`: `ops.history_integrity`
+- `task_name`: `R2 History integrity`
+- `platform`: `MBPro`
+- `source_repo`: `uk-aq-ops`
+
+Run lifecycle:
+
+1. Start: call `uk_aq_rpc_daily_task_started` for seeded task key
+   `ops.history_integrity`.
+2. Finish success: call `uk_aq_rpc_daily_task_finished`.
+3. Finish error: call `uk_aq_rpc_daily_task_failed`.
+4. Recompute status: call `uk_aq_rpc_recompute_daily_task_status` for the run date.
+
+Note: runtime does not write `daily_task_definitions`. If the task definition
+is missing, start reporting fails and reporting is skipped (or fails the run in
+strict mode).
+
+Default mode is best-effort: reporting failures are logged and the integrity
+run still proceeds. With strict mode enabled, reporting failures stop the run.
 
 ---
 
@@ -343,7 +372,7 @@ Python interpreter defaults to `python3`; override with
 ```text
 --env CIC-Test|LIVE                     (required)
 --profile daily|weekly|monthly|manual   (default: manual)
---source openaq|sensorcommunity|all      (default: all)
+--source openaq|sensorcommunity|uk_air_sos|all  (default: all)
 --from-day YYYY-MM-DD                   (manual profile or override)
 --to-day YYYY-MM-DD                     (manual profile or override)
 --dry-run                               No DB writes / no remote calls; logs the snapshot and OpenAQ plan.
@@ -382,6 +411,86 @@ Example commands:
 /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env CIC-Test --profile daily
 /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env LIVE --profile weekly
 /Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh --env LIVE --source openaq --from-day 2026-04-01 --to-day 2026-04-30 --dry-run
+```
+
+### UK-AIR SOS model and run examples
+
+Naming rules used by the active runtime:
+
+```text
+sensorcommunity
+uk_air_sos
+```
+
+SOS integrity model units:
+
+```text
+source check unit: station_ref + day_utc
+evidence/count unit: timeseries_id + day_utc
+observation repair unit: affected timeseries_ids + day_utc
+AQI rebuild unit: connector_id + day_utc
+```
+
+SOS canonical snapshot cache path:
+
+```text
+<source-cache>/uk_air_sos/station_ref=<station_ref>/day_utc=<YYYY-MM-DD>/snapshot.ndjson
+```
+
+Relevant SOS snapshot retention and 404 suppression settings:
+
+```text
+UK_AQ_HISTORY_INTEGRITY_KEEP_API_SNAPSHOTS=none|changed|all
+UK_AQ_HISTORY_INTEGRITY_UK_AIR_SOS_NOT_FOUND_COOLDOWN_MINUTES=<int, 0 disables>
+```
+
+First-seen and error handling rules:
+
+- `first_seen` is baseline-only and does not directly trigger backfill.
+- Cross-check can still trigger repair if R2 is missing/mismatched.
+- `no_data` is a successful zero-row snapshot and can baseline zero counts.
+- `not_found` is recorded clearly and does not create repair candidates by itself.
+- `temporary_error` and `permanent_error` do not overwrite prior good baseline hashes/counts and do not create repair candidates.
+
+Repair flow for eligible SOS discrepancies/changes:
+
+```text
+source_to_r2 + observations_only
+-> queue AQI rebuild (connector_id + day_utc)
+-> r2_history_obs_to_aqilevels + aqilevels_only
+```
+
+SOS-focused operational examples:
+
+```bash
+# Check-only SOS run (manual day window)
+/Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh \
+  --env CIC-Test \
+  --profile manual \
+  --source uk_air_sos \
+  --from-day 2026-05-01 \
+  --to-day 2026-05-03 \
+  --check-only
+
+# Dry-run planning with backfill enabled (no source writes, no wrapper execution)
+/Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh \
+  --env CIC-Test \
+  --profile manual \
+  --source uk_air_sos \
+  --from-day 2026-05-01 \
+  --to-day 2026-05-03 \
+  --dry-run \
+  --run-backfill
+
+# Narrow real SOS run with backfill enabled
+/Users/mikehinford/uk-aq-history-integrity/bin/uk-aq-history-integrity.sh \
+  --env CIC-Test \
+  --profile manual \
+  --source uk_air_sos \
+  --from-day 2026-05-01 \
+  --to-day 2026-05-01 \
+  --run-backfill \
+  --max-runtime-minutes 30
 ```
 
 ---
@@ -1195,8 +1304,34 @@ Delivered:
 - Per-file SHA-256 verification against `manifest.tables[].sha256`.
 - Streaming gzipped-NDJSON import for `connectors`, `stations`,
   `timeseries`, `phenomena` into `core_*_snapshot` tables.
-- Derived `source_station_timeseries_lookup` for `openaq` and
-  `sensorcommunity`, filtered to non-removed stations.
+- Derived `source_station_timeseries_lookup` for `openaq`,
+  `sensorcommunity`, and `uk_air_sos`, filtered to non-removed stations.
+- Phase 7.1 adds `--source uk_air_sos` for lookup/cross-check plumbing only
+  (no SOS API fetch adapter yet).
+- Phase 7.2 adds a canonical SOS station/day snapshot helper in the integrity
+  runtime: deterministic NDJSON rows sorted by `(timeseries_id, observed_at_utc)`
+  with status outcomes `ok|no_data|not_found|temporary_error|permanent_error`.
+  This phase does not write R2, does not write Supabase, and does not trigger
+  backfills.
+- Phase 7.3 adds the `uk_air_sos` station/day source adapter flow:
+  source state/events, per-timeseries source counts, and source-cache retention
+  policy via `UK_AQ_HISTORY_INTEGRITY_KEEP_API_SNAPSHOTS=none|changed|all`
+  (default `changed`). First-seen snapshots are baselined only (no direct
+  backfill trigger); temporary/permanent fetch errors do not overwrite the prior
+  baseline hashes/counts.
+- Phase 7.4 plugs `uk_air_sos` into the observation-repair path:
+  cross-check discrepancies plus SOS `changed`/`reappeared` source-change
+  targets are merged and deduped at `(connector_id, day_utc, timeseries_id)`.
+  Observation repair runs with `source_to_r2 + observations_only`, and successful
+  repair queues one AQI rebuild per `(connector_id, day_utc)`.
+- Phase 7.5 adds SOS error-handling/reporting polish:
+  explicit `no_data` vs `not_found` vs `temporary_error` vs `permanent_error`
+  counters, optional not-found retry suppression via
+  `UK_AQ_HISTORY_INTEGRITY_UK_AIR_SOS_NOT_FOUND_COOLDOWN_MINUTES`,
+  and report visibility for SOS cross-check/repair/AQI outcomes.
+- Phase 7.6 documentation pass is complete in this document and in
+  `system_docs/uk_aq_scripts.md`, including SOS model units, cache-path
+  contract, naming rules, and operational command examples.
 - Reuse decision based on `manifest_hash` plus a
   snapshot-tables-have-rows safety check; `core_snapshot_imports` row
   written for every attempt (`running`/`ok`/`error`).
@@ -1255,6 +1390,10 @@ Pass 1 (subprocess invocation + per-event recording):
   - `UK_AQ_BACKFILL_TRIGGER_MODE=manual`
   - if `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT` is unset, integrity auto-sets
     it to `<UK_AQ_HISTORY_INTEGRITY_SOURCE_CACHE_DIR>/openaq` for that call
+  - if `UK_AQ_BACKFILL_SOS_INTEGRITY_SNAPSHOT_ROOT` is unset, integrity
+    auto-sets it to `<UK_AQ_HISTORY_INTEGRITY_SOURCE_CACHE_DIR>/uk_air_sos`
+    so `source_to_r2` can reuse same-run SOS snapshot files before calling
+    the SOS API
 - Per-backfill result recorded on the `source_file_events` row:
   `backfill_triggered`, `backfill_timeseries_ids`,
   `backfill_status ∈ {ok, error, timeout, no_wrapper, no_env_file,
@@ -1281,6 +1420,17 @@ Pass 2 (batching, logs, monitoring):
   header (wrapper, env file, day, timeseries IDs, exit code, status)
   followed by full stdout/stderr. Path is also stored in the event's
   `notes`.
+- **Chunk-safe observation repair.** When observation-repair chunking is
+  active, integrity injects targeted-stage env vars so non-final chunks stage
+  merged rows locally and the final chunk performs one commit:
+  - `UK_AQ_BACKFILL_TARGETED_STAGE_ENABLED=true`
+  - `UK_AQ_BACKFILL_TARGETED_STAGE_ROOT=state/<ENV>/logs/backfill/<run_compact>/_targeted_stage/run_<run_id>/day_<YYYY-MM-DD>/connector_<id>`
+  - `UK_AQ_BACKFILL_TARGETED_STAGE_FINALIZE=false|true` (final chunk only true)
+  - `UK_AQ_BACKFILL_TARGETED_STAGE_CLEANUP=false|true` (final chunk only true)
+- **Adaptive chunking first-pass.** If chunking is configured and a batch
+  exceeds the chunk limit, integrity first tries one unchunked call
+  (`UK_AQ_HISTORY_INTEGRITY_BACKFILL_TRY_UNCHUNKED_FIRST=true`, default). If
+  that call fails/timeouts, integrity falls back to chunked calls.
 - **First-class run-row columns.** `integrity_runs` now carries
   `backfills_triggered` (attempted batches), `backfills_ok`, and
   `backfills_failed`. Backfill failures continue to bump `errors_count`.

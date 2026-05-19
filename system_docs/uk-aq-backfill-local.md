@@ -95,14 +95,38 @@ For each `(day_utc, connector_id)`:
 1. Fetch source rows for the requested day.
 2. If `UK_AQ_BACKFILL_TIMESERIES_IDS` is set, pre-filter OpenAQ location/day
    source fetches to only locations mapped to those requested timeseries IDs.
+   For `uk_air_sos`, pre-filter candidate timeseries bindings to only those
+   requested IDs before per-timeseries fetch.
 3. Read existing local Dropbox observations + AQI connector manifests/parquet.
 4. Split data by target timeseries IDs:
    - preserve non-target rows from local history
    - replace target rows with newly-built source rows
-5. Rebuild merged observations parquet + manifest.
-6. Rebuild merged AQI parquet + manifest.
-7. Upload merged connector outputs to live R2 (replace connector/day objects).
-8. Rebuild day-level manifests from connector manifests.
+5. Optional chunk-safe staging (when enabled): write merged rows to local stage
+   files and defer R2 commit until finalize chunk.
+6. Rebuild merged observations parquet + manifest.
+7. Rebuild merged AQI parquet + manifest.
+8. Upload merged connector outputs to live R2 (replace connector/day objects).
+9. Rebuild day-level manifests from connector manifests.
+
+### Chunk-safe targeted staging
+
+Integrity can run targeted `source_to_r2` in chunks. To avoid later chunks
+overwriting earlier chunk replacements, chunked calls can use local stage files:
+
+- `UK_AQ_BACKFILL_TARGETED_STAGE_ENABLED=true`
+- `UK_AQ_BACKFILL_TARGETED_STAGE_ROOT=<local dir>`
+- `UK_AQ_BACKFILL_TARGETED_STAGE_FINALIZE=false` for non-final chunks
+- `UK_AQ_BACKFILL_TARGETED_STAGE_FINALIZE=true` for the final chunk
+- `UK_AQ_BACKFILL_TARGETED_STAGE_CLEANUP=true` to remove stage files after
+  successful final commit
+
+Behaviour:
+
+1. Non-final chunk merges against stage baseline (if present) else local
+   history baseline, writes merged rows back to stage, and **does not commit**
+   to R2.
+2. Final chunk loads stage baseline, applies final targeted replacement, then
+   commits one merged connector/day result to R2.
 
 ### No-data tolerance
 
@@ -176,6 +200,7 @@ Recommended supporting vars in the backfill env file:
 
 - `UK_AQ_R2_HISTORY_DROPBOX_ROOT=<absolute local Dropbox backup root>`
 - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT=<absolute local OpenAQ cache root>`
+- `UK_AQ_BACKFILL_SOS_INTEGRITY_SNAPSHOT_ROOT=<absolute local integrity source-cache root>/uk_air_sos`
 - `CFLARE_R2_*` / `R2_*` credentials for live write
 
 For `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT`, backfill can reuse either local
@@ -183,6 +208,11 @@ cache layout:
 
 - `day_utc=YYYY-MM-DD/location-<location_id>-YYYYMMDD.csv.gz`
 - `locationid=<location_id>/year=YYYY/month=MM/location-<location_id>-YYYYMMDD.csv.gz`
+
+For `UK_AQ_BACKFILL_SOS_INTEGRITY_SNAPSHOT_ROOT`, `source_to_r2` can reuse
+same-run integrity SOS snapshots at:
+
+- `station_ref=<urlencoded_station_ref>/day_utc=YYYY-MM-DD/snapshot.ndjson`
 
 ## Outputs
 

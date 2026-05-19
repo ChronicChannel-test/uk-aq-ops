@@ -12,6 +12,7 @@ Daily task health tracks whether expected daily scheduled jobs reported for a UT
 | `ops.r2_history_dropbox_backup` | R2 history Dropbox backup | github | `uk-aq-ops` |
 | `ops.dropbox_prune_raw` | Dropbox prune raw | github | `uk-aq-ops` |
 | `ops.supabase_db_dump_backup` | Supabase DB dump backup | gcp | `uk-aq-ops` |
+| `ops.history_integrity` | R2 History integrity | MBPro | `uk-aq-ops` |
 
 ## Tables
 

@@ -326,6 +326,42 @@ psql $LIVE_SUPABASE_DB_URL < schemas/ingest_db/uk_aq_security.sql
 psql $LIVE_OBS_AQIDB_DB_URL < schemas/obs_aqi_db/uk_aq_obs_aqi_db_schema.sql
 ```
 
+### 2.2a Verify PostgREST schema exposure for obs_aqidb
+
+The Operations dashboard daily task card reads `uk_aq_ops.daily_task_runs_dashboard` through PostgREST.  
+If PostgREST does not expose `uk_aq_ops`, requests fail with `PGRST106` (`Invalid schema: uk_aq_ops`) even when the view exists.
+
+1. In Supabase UI (live obs_aqidb): Data API -> Settings -> Exposed schemas
+   Ensure both `uk_aq_public` and `uk_aq_ops` are exposed, then save.
+
+2. Check effective `authenticator` PostgREST config overrides:
+
+```sql
+select
+  d.datname,
+  r.rolname,
+  s.setconfig
+from pg_db_role_setting s
+join pg_roles r on r.oid = s.setrole
+left join pg_database d on d.oid = s.setdatabase
+where r.rolname = 'authenticator';
+```
+
+3. If a `datname='postgres'` row exists and `pgrst.db_schemas` does not include `uk_aq_ops`, update it:
+
+```sql
+alter role authenticator in database postgres
+set pgrst.db_schemas = 'public,uk_aq_public,uk_aq_ops';
+
+notify pgrst, 'reload config';
+notify pgrst, 'reload schema';
+```
+
+4. Validate from PostgREST using a service-role key and `Accept-Profile: uk_aq_ops` against:
+   `/rest/v1/daily_task_runs_dashboard?select=run_id&limit=1`
+
+Do not add `ALTER ROLE ... pgrst.db_schemas` statements to schema SQL files. Keep this as deployment/runbook configuration.
+
 ### 2.3 Verify
 
 ```sql

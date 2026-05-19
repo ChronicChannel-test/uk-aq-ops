@@ -166,6 +166,7 @@ This section describes where each panel on `dashboard/index.html` gets its data 
 - `GET /api/storage_coverage` -> storage-coverage calendar payload.
 - `GET /api/r2_metrics` -> on-demand R2 usage/limits refresh (used by the "Refresh R2 metrics" button).
 - `GET /api/r2_connector_counts` -> R2 connector/day-count charts inside the storage-coverage panel.
+- `GET /api/daily_task_runs` -> daily task run rows for the Operations card (`day=YYYY-MM-DD`, `mode=latest|all`).
 - `POST /api/connectors` -> saves connector polling settings edits from the dashboard UI.
 - `POST /api/dispatcher_settings` -> saves dispatcher settings edits from the dashboard UI.
 
@@ -180,6 +181,7 @@ This section describes where each panel on `dashboard/index.html` gets its data 
 | DB Size Trend (line + stacked charts) | `/api/dashboard` | Primary: external DB-size metrics API (`UK_AQ_DB_SIZE_API_URL`) returning `db_size_metrics`, `schema_size_metrics`, `r2_domain_size_metrics`; fallback/top-up: Supabase views `uk_aq_db_size_metrics_hourly`, `uk_aq_schema_size_metrics_hourly`, `uk_aq_r2_domain_size_metrics_hourly` |
 | R2 usage bars + free-tier percentages | `/api/dashboard`, `/api/r2_metrics` | Cloudflare account metrics API calls in backend (`_fetch_r2_account_metrics`) using R2/Cloudflare account token env vars |
 | R2 history window label | `/api/dashboard`, `/api/r2_metrics` | Preferred: external history-days API (`UK_AQ_R2_HISTORY_DAYS_API_URL`); fallback: Supabase RPC `uk_aq_rpc_r2_history_days_by_domain`; additional fallback range RPC `uk_aq_rpc_r2_history_window` |
+| Daily Tasks Latest Runs (Operations) | `/api/daily_task_runs` | ObsAQI DB view `uk_aq_ops.daily_task_runs_dashboard` (joins `uk_aq_ops.daily_task_runs` + `uk_aq_ops.daily_task_definitions`), filtered by `scheduled_for_date` and mode (`latest` or `all`) |
 | Storage Coverage calendar | `/api/storage_coverage` (also optionally embedded in `/api/dashboard`) | Ingest day presence: ingestdb RPC `uk_aq_rpc_observations_hourly_fingerprint`; OBS/AQI day presence: obs_aqidb view `uk_aq_obs_aqidb_day_counts_current` (with RPC fallbacks); R2 day presence: external history-days API (or fallback `uk_aq_rpc_r2_history_days_by_domain`); Dropbox backup days: local/remote Dropbox checkpoint JSON |
 | Storage Coverage R2 connector counts cards | `/api/r2_connector_counts` | External R2 history-counts API (`UK_AQ_R2_HISTORY_COUNTS_API_URL`) |
 
