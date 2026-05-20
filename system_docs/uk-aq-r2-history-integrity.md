@@ -393,7 +393,7 @@ Current runtime behavior for OpenAQ integrity runs:
 | Flags | Remote HEAD/download checks | Change detection + DB writes | Backfill wrapper execution | Planned backfill commands logged |
 |---|---|---|---|---|
 | none | Yes | Yes | No | No |
-| `--run-backfill` | Yes | Yes | Yes (for changed files and cross-check `mismatch`/`source_only`) | Yes |
+| `--run-backfill` | Yes | Yes | Yes (for changed files and cross-check `mismatch`/`source_only`/`r2_manifest_missing`; excludes `r2_timeseries_counts_missing`) | Yes |
 | `--dry-run` | No | No | No | No |
 | `--dry-run --run-backfill` | No | No | No | Yes (cross-check candidates only) |
 | `--check-only` | Same as corresponding row above | Same as corresponding row above | Same as corresponding row above | Same as corresponding row above |
@@ -1102,6 +1102,8 @@ Execution shape:
   `source_to_r2`).
 
 `r2_only` does **not** trigger observation repair.
+`r2_timeseries_counts_missing` does **not** trigger observation repair; it means
+the index metadata needs timeseries-count enrichment first.
 
 So if a run ends with `backfills_attempted=0`, it means no eligible
 source-change and no eligible cross-check discrepancy was found in the
@@ -1544,6 +1546,22 @@ upstream archive contains.
   node scripts/backup_r2/uk_aq_build_r2_history_index.mjs \
     --domain observations --compute-missing-timeseries-counts
   ```
+  Targeted mode is also supported for low-cost repair runs:
+  ```bash
+  # 1) Build a local report from the Dropbox R2 mirror
+  node scripts/backup_r2/uk_aq_report_missing_timeseries_counts_local.mjs \
+    --format csv \
+    --targets-only \
+    --out ./tmp/missing_timeseries_counts_targets.csv
+
+  # 2) Rebuild only those observation day/connector units in R2
+  node scripts/backup_r2/uk_aq_build_r2_history_index.mjs \
+    --domain observations \
+    --targets-csv ./tmp/missing_timeseries_counts_targets.csv \
+    --compute-missing-timeseries-counts
+  ```
+  Equivalent direct targeting (no CSV) is available with repeated
+  `--target YYYY-MM-DD:connector_id`.
   Reads `parquet-wasm` (already a dep). Idempotent — re-runs on a
   patched day skip the parquet reads.
 - A new normalised SQLite table records source-side counts:
@@ -1571,9 +1589,10 @@ upstream archive contains.
   `history/_index/observations_timeseries/.../manifest.json`, and compares
   `timeseries_row_counts`.
 - Outcomes recorded in a new `cross_checks` table with status
-  `ok | source_only | r2_only | mismatch | r2_manifest_missing`.
+  `ok | source_only | r2_only | mismatch | r2_manifest_missing | r2_timeseries_counts_missing`.
 - Run row and report grow `cross_checks_total / ok / mismatch /
-  source_only / r2_only / r2_manifest_missing` counters.
+  source_only / r2_only / r2_manifest_missing` counters, plus report-level
+  `cross_checks_r2_timeseries_counts_missing`.
 - New CLI flag `--skip-cross-check` for debug/recovery; pass runs by
   default.
 

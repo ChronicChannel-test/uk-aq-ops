@@ -70,6 +70,31 @@ system doc.
   - Reads the inventory, compares hashes to the Dropbox checkpoint, copies only changed/missing units.
   - Retries Dropbox write-rate throttle errors (`too_many_write_operations`) with exponential backoff before failing the run.
   - Fails loudly if the inventory is missing/invalid; no fallback to direct scan.
+- `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
+  - Rebuilds R2 history latest/index manifests for `observations`, `aqilevels`, or both.
+  - Supports targeted observations rebuilds via:
+    - `--target YYYY-MM-DD:connector_id` (repeatable)
+    - `--targets-csv <path>` where CSV includes `day_utc,connector_id`.
+  - `--compute-missing-timeseries-counts` can patch missing connector-manifest
+    `timeseries_row_counts` from parquet before writing index manifests.
+- `scripts/backup_r2/uk_aq_report_missing_timeseries_counts_local.mjs`
+  - Scans local Dropbox R2 mirror files for observation `(day_utc, connector_id)`
+    units where `timeseries_row_counts` are missing/invalid in connector or
+    observations-timeseries index manifests.
+  - Outputs CSV/JSON; CSV includes `day_utc,connector_id` so the report can be
+    fed into `uk_aq_build_r2_history_index.mjs --targets-csv ...`.
+- `scripts/backup_r2/uk_aq_validate_aqi_from_dropbox_observs.mjs`
+  - Recomputes AQI history rows from local Dropbox observations parquet and
+    compares them to local Dropbox aqilevels parquet by `(day_utc, connector_id)`.
+  - `--dry-run` (default) reports mismatches only and does not write to R2.
+  - `--write-r2` runs targeted AQI rebuild writes via
+    `scripts/uk_aq_backfill_local.sh` in `r2_history_obs_to_aqilevels` mode.
+- `scripts/backup_r2/uk_aq_strip_day_timeseries_counts_from_r2.mjs`
+  - Scans local Dropbox observations day manifests for top-level
+    `timeseries_row_counts` and reports affected days.
+  - `--dry-run` (default) reports only.
+  - `--write-r2` removes top-level day-manifest `timeseries_row_counts` in R2
+    for matching days and rewrites `manifest_hash` deterministically.
 - `scripts/backup_r2/lib/`
   - `rclone.mjs` shared rclone wrappers + sha256 + path helpers.
   - `inventory.mjs` schema constants + `loadInventory(...,{strict})` used by both scripts.

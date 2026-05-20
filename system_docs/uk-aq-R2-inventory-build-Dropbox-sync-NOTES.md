@@ -36,6 +36,7 @@ For UK-AQ history, that can include:
 
 ```text
 - observations day manifests
+- observations connector manifests
 - aqilevels day manifests
 - core day manifests
 - latest index JSON files
@@ -253,7 +254,7 @@ The reason: lsjson --recursive enumerates every object under those prefixes, inc
 Cheap fix when you're rested: add --max-depth 2 to rcloneLsjsonRecursive when scanning day folders (it's depth 2: day_utc=*/manifest.json), and --max-depth 3 when scanning timeseries trees (day_utc=*/connector_id=*/manifest.json). Should chop builder time from 31 min to a few minutes. Not urgent.
 
 Sync (~61 min) — first-run cost from empty new checkpoint sections
-This is the real surprise. The new checkpoint has two new sections: index_files and index_tree_units. Your existing Dropbox checkpoint (from the old sync) only had domains.<name>.days[...]. So on this first run:
+This is the real surprise. The new checkpoint has three extra sections: index_files, index_tree_units, and committed_connector_units. Your existing Dropbox checkpoint (from the old sync) only had domains.<name>.days[...]. So on this first run:
 
 The day comparisons all matched (same hash format as before) → ~0 day copies
 But all 4 index files + 3922 timeseries tree units were absent from the new checkpoint sections → every single one got queued for rclone copyto
@@ -404,4 +405,3 @@ When you're ready to test the fix:
 Wait for/trigger the prune deploy
 Wait for/trigger prune to run
 rclone cat ... on the same January-1 tree unit and check both timestamps now match the March value
-
