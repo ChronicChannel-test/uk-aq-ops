@@ -7,7 +7,7 @@ This pipeline publishes deterministic latest-value snapshot JSON files to R2 and
 Phase A matrix:
 
 - `pollutant`: `pm25`, `pm10`, `no2`
-- `window`: `3h`, `6h`, `1d`
+- `window`: `3h`, `6h`, `1d`, `7d`, `all`
 - `network_group`: `all`
 
 Build frequency is every minute via Cloud Scheduler.
@@ -76,7 +76,7 @@ Accepted alias:
 Valid values:
 
 - `pollutant`: `pm25`, `pm10`, `no2`
-- `window`: `3h`, `6h`, `1d`
+- `window`: `3h`, `6h`, `1d`, `7d`, `all`
 - `network_group`: `all`
 
 Note:
@@ -107,7 +107,7 @@ Builder data/object controls:
 - `UK_AQ_LATEST_SNAPSHOT_SOURCE_RPC` (default `uk_aq_latest_rpc`)
 - `UK_AQ_LATEST_SNAPSHOT_LIMIT` (default `10000`; hard-capped in code at `10000`)
 - `UK_AQ_LATEST_SNAPSHOT_POLLUTANTS` (default `pm25,pm10,no2`)
-- `UK_AQ_LATEST_SNAPSHOT_WINDOWS` (default `3h,6h,1d`)
+- `UK_AQ_LATEST_SNAPSHOT_WINDOWS` (default `3h,6h,1d,7d,all`)
 - `UK_AQ_LATEST_SNAPSHOT_NETWORK_GROUP` (default `all`)
 - `UK_AQ_LATEST_SNAPSHOT_R2_PREFIX` (default `latest_snapshots/v1`)
 - `UK_AQ_LATEST_SNAPSHOT_MANIFEST_KEY` (default `${prefix}/manifest.json`)
