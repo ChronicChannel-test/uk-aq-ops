@@ -95,6 +95,15 @@ system doc.
   - `--dry-run` (default) reports only.
   - `--write-r2` removes top-level day-manifest `timeseries_row_counts` in R2
     for matching days and rewrites `manifest_hash` deterministically.
+- `scripts/backup_r2/uk_aq_rebuild_r2_day_manifest_from_connectors.mjs`
+  - Rebuilds one observations or aqilevels R2 day manifest from the connector
+    manifests already present under that day.
+  - Metadata-only: does not read source DB rows or parquet payloads.
+  - `--dry-run` (default) reports the rebuilt manifest summary only.
+  - `--write-r2` writes the repaired day manifest; run
+    `uk_aq_build_r2_history_index.mjs --domain <domain>` afterwards, without
+    `--target`/`--targets-csv`, so latest/index manifests pick up the repaired
+    day.
 - `scripts/backup_r2/lib/`
   - `rclone.mjs` shared rclone wrappers + sha256 + path helpers.
   - `inventory.mjs` schema constants + `loadInventory(...,{strict})` used by both scripts.

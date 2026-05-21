@@ -71,6 +71,13 @@ Daily output layout:
 
 Retention is applied separately to the `ingestdb` and `obs_aqidb` dated folders.
 
+Schema dump post-processing notes:
+
+- `schema.sql` is prefixed with `create extension if not exists pg_cron;` when missing.
+- For `obs_aqidb`, `schema.sql` is also prefixed with a guarded role-setting block to keep Data API schema exposure stable on restore:
+  - `alter role authenticator set pgrst.db_schemas = 'public,graphql_public,uk_aq_public,uk_aq_ops';`
+  - the block catches insufficient-privilege / missing-role errors and continues.
+
 ## Code locations
 
 - Service HTTP entrypoint:
