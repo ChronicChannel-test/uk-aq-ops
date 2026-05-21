@@ -25,6 +25,7 @@ The required chain is:
    - `roles.sql.gz`
    - `schema.sql.gz`
    - `data.sql.gz`
+   - `cron_jobs.sql.gz`
 5. Files are uploaded to Dropbox under dated folders.
 6. Dropbox folders older than the retention window are deleted.
 7. The service returns structured JSON and uses non-2xx status on failure.
@@ -65,9 +66,11 @@ Daily output layout:
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/ingestdb/YYYY-MM-DD/roles.sql.gz`
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/ingestdb/YYYY-MM-DD/schema.sql.gz`
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/ingestdb/YYYY-MM-DD/data.sql.gz`
+- `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/ingestdb/YYYY-MM-DD/cron_jobs.sql.gz`
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/obs_aqidb/YYYY-MM-DD/roles.sql.gz`
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/obs_aqidb/YYYY-MM-DD/schema.sql.gz`
 - `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/obs_aqidb/YYYY-MM-DD/data.sql.gz`
+- `{UK_AQ_DROPBOX_ROOT}/Supabase_Backup_db_dump/obs_aqidb/YYYY-MM-DD/cron_jobs.sql.gz`
 
 Retention is applied separately to the `ingestdb` and `obs_aqidb` dated folders.
 
@@ -77,6 +80,7 @@ Schema dump post-processing notes:
 - For `obs_aqidb`, `schema.sql` is also prefixed with a guarded role-setting block to keep Data API schema exposure stable on restore:
   - `alter role authenticator set pgrst.db_schemas = 'public,graphql_public,uk_aq_public,uk_aq_ops';`
   - the block catches insufficient-privilege / missing-role errors and continues.
+- `cron_jobs.sql` is generated from direct `cron.job` reads and uploaded separately, so cron restore does not rely on Supabase CLI including extension-managed schema rows in `data.sql`.
 
 ## Code locations
 
