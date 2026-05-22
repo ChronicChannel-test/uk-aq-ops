@@ -43,12 +43,13 @@ Build frequency is every minute via Cloud Scheduler.
 1. Cloud Scheduler triggers Cloud Run service every minute.
 2. Cloud Run service pulls Pub/Sub observations from the latest-snapshot subscription.
 3. Service updates R2 latest-state object.
-4. Service loads cached core metadata (refreshes from latest `history/v1/core/day_utc=...` snapshot once stale).
-5. Service builds the matrix payloads and writes changed snapshot objects to R2.
-6. Service writes/updates latest family manifest.
-7. Browser calls cache proxy route: `/api/aq/latest-snapshot?...`.
-8. Cache proxy forwards to latest snapshot R2 API worker URL from `UK_AQ_LATEST_SNAPSHOT_R2_API_URL`.
-9. R2 API Worker validates upstream auth and serves object from R2.
+4. Service acknowledges pulled Pub/Sub messages in bounded chunks to stay below Pub/Sub request-size limits during burst/backlog drains.
+5. Service loads cached core metadata (refreshes from latest `history/v1/core/day_utc=...` snapshot once stale).
+6. Service builds the matrix payloads and writes changed snapshot objects to R2.
+7. Service writes/updates latest family manifest.
+8. Browser calls cache proxy route: `/api/aq/latest-snapshot?...`.
+9. Cache proxy forwards to latest snapshot R2 API worker URL from `UK_AQ_LATEST_SNAPSHOT_R2_API_URL`.
+10. R2 API Worker validates upstream auth and serves object from R2.
 
 ## R2 Key Layout
 
@@ -171,6 +172,11 @@ Cloud Run builder fails with subscription safety error:
 
 1. Check `UK_AQ_LATEST_SNAPSHOT_PUBSUB_SUBSCRIPTION` is configured to a dedicated subscription.
 2. Ensure it is not equal to `OBSERVS_PUBSUB_SUBSCRIPTION`.
+
+Cloud Run builder fails with `Request payload size exceeds the limit: 524288 bytes` from Pub/Sub acknowledge:
+
+1. Deploy the builder with ack chunking support from `workers/uk_aq_latest_snapshot_cloud_run/run_job.ts`.
+2. Re-check `subscription/num_undelivered_messages` for `uk-aq-latest-snapshot-sub`; it should fall once the next runs acknowledge the backlog in chunks.
 
 ## One-Off State Bootstrap
 
