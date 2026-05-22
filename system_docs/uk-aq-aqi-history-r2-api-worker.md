@@ -8,8 +8,8 @@ Deploy workflow: `.github/workflows/uk_aq_aqi_history_r2_api_worker_deploy.yml`
 
 Cloudflare Worker for timeseries AQI history reads, stitched from:
 
-- recent window from `obs_aqidb` (`uk_aq_public.uk_aq_timeseries_aqi_hourly`), and
-- older window from R2 backups (`history/v1/aqilevels`).
+- primary source: R2 backups (`history/v1/aqilevels`)
+- fallback/repair source for recent gaps: `obs_aqidb` (`uk_aq_public.uk_aq_timeseries_aqi_hourly`)
 
 This is intended for website DAQI/EAQI charts where recent AQI is not yet exported to R2.
 
@@ -43,12 +43,11 @@ Optional:
 
 Window split behavior:
 
-- default recent source-of-truth window is last `168` hours (7 days) from now.
-- requests are split into:
-  - older segment -> R2 history, and
-  - recent segment -> ObsAQIDB live table/view.
-- overlapping timestamps are de-duplicated by hour, with ObsAQIDB rows winning.
-- if the recent ObsAQIDB read fails, the worker falls back to R2 for that same recent window instead of failing the whole request.
+- worker reads R2 first across the full requested range.
+- `UK_AQ_AQI_HISTORY_SOURCE_OF_TRUTH_HOURS` (default `168`) defines the recent fallback window eligible for ObsAQIDB repairs.
+- worker calls ObsAQIDB only when recent R2 coverage appears missing or incomplete.
+- overlapping timestamps are de-duplicated by hour, with R2 rows winning.
+- if ObsAQIDB fallback fails, R2 results are still returned when available.
 - cache TTL is also dynamic by the requested end time:
   - requests ending within the last 24 hours use the short live TTL
   - requests ending more than 24 hours ago use the long immutable-history TTL
@@ -113,10 +112,10 @@ Do not point `UK_AQ_AQI_HISTORY_R2_API_URL` back to `/api/aq/aqi-history` (would
 
 ## Response diagnostics
 
-Coverage metadata includes the live/fallback status for the recent window:
+Coverage metadata includes fallback status for the recent window:
 
-- `coverage.obs_aqidb_status`: `not_requested`, `live`, or `history_fallback`
-- `coverage.obs_aqidb_error`: recent live-read error message when fallback was needed
+- `coverage.obs_aqidb_status`: `not_requested`, `fallback_live`, or `fallback_error`
+- `coverage.obs_aqidb_error`: fallback read error message when present
 - `coverage.target_connector_id`: resolved connector id for the requested timeseries window context when lookup succeeds
 - `coverage.target_station_id`: resolved station id for the requested timeseries window context (metadata only; parquet filtering is timeseries-based)
 - `coverage.timeseries_window_context_lookup_source_path`: PostgREST source used for timeseries window context lookup
@@ -125,9 +124,10 @@ Coverage metadata includes the live/fallback status for the recent window:
 - `coverage.target_timeseries_id_count`: number of timeseries ids used for AQI index filtering
 - `coverage.history_scan_complete` / `coverage.history_scan_stopped_reason`: whether the main R2 history scan completed without budget cut-off
 - `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, `skipped_files_by_pollutant`, and warnings)
-- `coverage.r2_recent_fallback_*`: best-effort R2 fallback window, counts, and missing-file diagnostics for the recent segment
-- `coverage.r2_recent_fallback_scan_complete` / `coverage.r2_recent_fallback_scan_stopped_reason`: whether recent fallback R2 scan completed when fallback was used
-- `coverage.r2_recent_fallback_timeseries_index`: AQI index diagnostics for the recent fallback segment
+- `coverage.obs_aqidb_fallback_used`: whether ObsAQIDB fallback rows were merged
+- `coverage.obs_aqidb_fallback_reason`: currently `r2_recent_missing_or_incomplete` when fallback path runs
+- `coverage.obs_aqidb_fallback_recent_r2_point_count`: R2 hourly point count in the recent fallback window
+- `coverage.obs_aqidb_fallback_error`: fallback error when ObsAQIDB fallback fails but R2 data was still returned
 - top-level `response_complete`: `true` when required R2 scans were not cut short by scan budgets
 - top-level `cache_scope`: `recent` or `immutable`
 
