@@ -104,6 +104,19 @@ system doc.
     `uk_aq_build_r2_history_index.mjs --domain <domain>` afterwards, without
     `--target`/`--targets-csv`, so latest/index manifests pick up the repaired
     day.
+- `scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_existing_r2.mjs`
+  - One-off bootstrap utility for the Pub/Sub-based latest snapshot builder.
+  - Reads existing latest snapshot objects (`latest_snapshots/v1/...`) plus
+    latest core snapshot timeseries mapping (`history/v1/core/day_utc=...`) and
+    builds `latest_state.json` for `latest_snapshots_state/v1` (or custom
+    `--state-key`).
+  - `--write-r2` applies the seed; default is dry-run/report only.
+- `scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_supabase.mjs`
+  - One-off refresh utility for latest snapshot state using Supabase latest RPC.
+  - Pulls matrix rows from `uk_aq_latest_rpc` (configurable), dedupes by
+    `(connector_id, timeseries_id)` with newest `last_value_at`, and writes
+    `latest_state.json` for `latest_snapshots_state/v1` (or custom `--state-key`).
+  - `--write-r2` applies the refreshed state; default is dry-run/report only.
 - `scripts/backup_r2/lib/`
   - `rclone.mjs` shared rclone wrappers + sha256 + path helpers.
   - `inventory.mjs` schema constants + `loadInventory(...,{strict})` used by both scripts.

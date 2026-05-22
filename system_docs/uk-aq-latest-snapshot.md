@@ -172,6 +172,42 @@ Cloud Run builder fails with subscription safety error:
 1. Check `UK_AQ_LATEST_SNAPSHOT_PUBSUB_SUBSCRIPTION` is configured to a dedicated subscription.
 2. Ensure it is not equal to `OBSERVS_PUBSUB_SUBSCRIPTION`.
 
+## One-Off State Bootstrap
+
+If the builder has just migrated from the old RPC source and you want immediate coverage,
+seed state once from existing snapshot objects:
+
+```bash
+node scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_existing_r2.mjs \
+  --report-out ./tmp/latest_snapshot_state_seed_report.json
+```
+
+Apply to R2:
+
+```bash
+node scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_existing_r2.mjs \
+  --write-r2 \
+  --report-out ./tmp/latest_snapshot_state_seed_report.json
+```
+
+This is normally a one-off operation. Re-run only if you intentionally reset
+or replace the latest snapshot state object.
+
+If snapshot coverage is stale and you need a one-off refresh from Supabase latest RPC:
+
+```bash
+node scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_supabase.mjs \
+  --report-out ./tmp/latest_snapshot_state_from_supabase_report.json
+```
+
+Apply to R2:
+
+```bash
+node scripts/backup_r2/uk_aq_seed_latest_snapshot_state_from_supabase.mjs \
+  --write-r2 \
+  --report-out ./tmp/latest_snapshot_state_from_supabase_report.json
+```
+
 ## Related Docs
 
 - `system_docs/uk-aq-cache-proxy.md`
