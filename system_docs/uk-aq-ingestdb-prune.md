@@ -171,6 +171,10 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_ROW_GROUP_SIZE` (default `50000`; observations override, falls back to `UK_AQ_R2_HISTORY_ROW_GROUP_SIZE`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_ROW_GROUP_SIZE` (default shared fallback above)
 - `UK_AQ_R2_HISTORY_MAX_CANDIDATES_PER_RUN` (default `500`)
+- `UK_AQ_R2_HISTORY_ADOPT_EXISTING_MANIFEST_ENABLED` (default `true`; adopt existing committed connector manifest/day when present instead of rewriting connector parquet/manifest)
+- `UK_AQ_R2_HISTORY_PRUNE_CHECK_DROPBOX_ENABLED` (default `false`; optional Dropbox comparison export for adopted connectors)
+- `UK_AQ_R2_HISTORY_PRUNE_CHECK_DROPBOX_REQUIRED` (default `false`; fail adoption if comparison upload fails when enabled)
+- `UK_AQ_R2_HISTORY_PRUNE_CHECK_DROPBOX_DIR` (default `prune_r2_check`)
 - `UK_AQ_R2_HISTORY_STAGING_RETENTION_DAYS` (default `7`)
 - `UK_AQ_R2_HISTORY_STAGING_PREFIX` (default `history/v1/_ops/observations/staging`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
@@ -235,4 +239,3 @@ But I'd recommend the fix (Option A.3: stop including generated_at in the hashab
 Was there something specific about the prune-daily connection that didn't feel right? I want to make sure I'm answering the actual concern.
 
 I was just checking that it actually did. I suppose there is a good reason to also rebuild it there, because the R2 data has changed, so it keeps the inventory fresh. 
-
