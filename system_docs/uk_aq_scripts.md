@@ -218,6 +218,21 @@ See [`uk-aq-r2-history-dropbox-backup.md`](uk-aq-r2-history-dropbox-backup.md) f
     - `observs-only` -> `UK_AQ_BACKFILL_RUN_MODE=source_to_r2` + `UK_AQ_BACKFILL_OUTPUT_SCOPE=observations_only`
     - `aqi-only` -> `UK_AQ_BACKFILL_RUN_MODE=r2_history_obs_to_aqilevels` + `UK_AQ_BACKFILL_OUTPUT_SCOPE=aqilevels_only`
 
+## GCP Secret Manager scripts
+
+- `scripts/gcp/uk_aq_secret_upsert_if_changed.sh`
+  - Upserts one secret from stdin with dry-run as default.
+  - Compares proposed value against the latest enabled secret version without printing values.
+  - Creates a new version only when changed.
+  - In apply mode, destroys older active versions and verifies exactly one active version remains.
+  - Detects Cloud Run numeric secret-version pins and can update them to `latest` before cleanup.
+
+- `scripts/gcp/uk_aq_cleanup_secret_versions.sh`
+  - Project-wide cleanup utility (dry-run by default) to keep one active version per secret.
+  - Lists active versions/states per secret, selects a keep version, and plans/executes destroys.
+  - Checks Cloud Run secret references first; by default it skips secrets with numeric-version pins unless `--fix-cloud-run-pins 1` is provided.
+  - In apply mode, verifies each processed secret ends with exactly one active version.
+
 ## Cache proxy checks
 
 - `scripts/uk_aq_cache_proxy/check_timeseries_v2_skeleton.mjs`
