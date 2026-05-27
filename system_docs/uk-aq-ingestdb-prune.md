@@ -68,7 +68,9 @@ Comparison scope rule:
   - page size `1000`
   - max discovery pages `100`
   - max targeted day windows per run `14`
-- For each detected `day_utc`, the service runs a targeted 24-hour prune window (`00:00Z` to `00:00Z + 1 day`) using the same compare/repair/delete flow and the same history gate checks.
+- The late-arrival target list is split by the obs_aqidb retention cutover:
+  - days older than `OBS_AQIDB_OBSERVS_RETENTION_DAYS` (default `14`, overrideable via `obsAqidbObservsRetentionDays`) are deleted directly from ingest by hour bucket, without compare/repair
+  - younger days still run the normal targeted 24-hour compare/repair/delete flow and the same history gate checks
 - This catches backfilled historical observations that arrived recently without widening the normal daily prune window.
 
 ## Dry-run behavior
