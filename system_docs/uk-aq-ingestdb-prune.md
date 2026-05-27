@@ -62,6 +62,16 @@ Comparison scope rule:
 - deletable plan at `INFO`
 - history-only buckets at `INFO` with event `history_extra_buckets`
 
+5. Late-arrival cleanup pass (code-only, no new env vars):
+- After the main window run, the service scans recent inserts in ingest (`created_at`) and finds rows whose `observed_at` is older than the current prune window start.
+- Discovery bounds:
+  - `lookback_hours = max(24, MAX_HOURS_PER_RUN)`
+  - page size `1000`
+  - max discovery pages `100`
+  - max targeted day windows per run `14`
+- For each detected `day_utc`, the service runs a targeted 24-hour prune window (`00:00Z` to `00:00Z + 1 day`) using the same compare/repair/delete flow and the same history gate checks.
+- This catches backfilled historical observations that arrived recently without widening the normal daily prune window.
+
 ## Dry-run behavior
 
 When `INGESTDB_PRUNE_DRY_RUN=true`, no delete RPC is called.
@@ -135,6 +145,11 @@ Each bucket is deleted in bounded batches until:
   - `ingestdb_prune_batch_plan` at run start
   - per-batch `ingestdb_prune_run_start`
   - one final aggregate summary event (`ingestdb_prune_dry_run_batched_summary` or `ingestdb_prune_delete_batched_summary`)
+- Late-arrival pass logs:
+  - `ingestdb_late_arrival_discovery_summary`
+  - `ingestdb_late_arrival_cleanup_plan`
+  - `ingestdb_late_arrival_cleanup_summary`
+  - optional per-day failure event: `ingestdb_late_arrival_cleanup_day_error`
 - History-only buckets (present in history, missing in ingest) are logged once per run as:
   - `severity=INFO`
   - `event=history_extra_buckets`
