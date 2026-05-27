@@ -67,11 +67,13 @@ Comparison scope rule:
 - Discovery bounds:
   - page size `1000`
   - max discovery pages `100`
+  - discovery scan cap `100,000` stale rows per run
   - max targeted day windows per run `14`
 - The late-arrival target list is split by the obs_aqidb retention cutover:
   - days older than `OBS_AQIDB_OBSERVS_RETENTION_DAYS` (default `14`, overrideable via `obsAqidbObservsRetentionDays`) are deleted directly from ingest by hour bucket, without compare/repair
   - younger days still run the normal targeted 24-hour compare/repair/delete flow and the same history gate checks
   - the `14`-day cap now applies only to the repair-eligible subset, not to the direct-delete subset
+- If the backlog is larger than the discovery scan cap, rerunning the prune job will continue from the remaining stale rows.
 - This catches backfilled historical observations that arrived recently without widening the normal daily prune window.
 
 ## Dry-run behavior
