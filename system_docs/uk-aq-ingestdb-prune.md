@@ -63,9 +63,8 @@ Comparison scope rule:
 - history-only buckets at `INFO` with event `history_extra_buckets`
 
 5. Late-arrival cleanup pass (code-only, no new env vars):
-- After the main window run, the service scans recent inserts in ingest (`created_at`) and finds rows whose `observed_at` is older than the current prune window start.
+- After the main window run, the service scans stale observations directly by `observed_at` and looks for any rows older than the current prune window start.
 - Discovery bounds:
-  - `lookback_hours = max(24, MAX_HOURS_PER_RUN)`
   - page size `1000`
   - max discovery pages `100`
   - max targeted day windows per run `14`
