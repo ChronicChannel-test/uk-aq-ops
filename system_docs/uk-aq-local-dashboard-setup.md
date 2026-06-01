@@ -294,5 +294,5 @@ tail -f "/Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Network
 ## Cloud Run (unchanged)
 
 The existing Cloud Run deployment is not modified. It remains as a fallback.
-The Cloudflare Worker at `api/worker/` can be pointed back to Cloud Run by restoring
+The Cloudflare Worker at `workers/uk_aq_dashboard_online_api_worker/` can be pointed back to Cloud Run by restoring
 `DASHBOARD_UPSTREAM_BASE_URL` in the worker's environment if local hosting is unavailable.
