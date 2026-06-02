@@ -853,6 +853,7 @@ Then call the existing backfill wrapper with:
 ```bash
 UK_AQ_BACKFILL_RUN_MODE=source_to_r2
 UK_AQ_BACKFILL_FORCE_REPLACE=true
+UK_AQ_BACKFILL_REBUILD_R2_HISTORY_INDEX=false
 UK_AQ_BACKFILL_TIMESERIES_IDS=<comma separated ids>
 UK_AQ_BACKFILL_FROM_DAY_UTC=<day>
 UK_AQ_BACKFILL_TO_DAY_UTC=<day>
@@ -866,6 +867,19 @@ UK_AQ_BACKFILL_TIMESERIES_IDS=12345,12346
 ```
 
 internally normalising to a list.
+
+After a successful non-dry-run integrity repair, the integrity wrapper runs one
+targeted R2 history index update for the repaired day range instead of calling
+the backfill wrapper's full-history rebuild path. The targeted update:
+
+- reads the affected day manifest(s) directly by key
+- rebuilds the affected latest domain index entry/entries
+- refreshes the affected observations or AQI timeseries latest index window
+- rewrites only the targeted connector/day index manifests when a connector
+  filter is supplied
+
+This keeps integrity repairs narrow and avoids the repeated full-history R2
+prefix scans that were inflating R2 read operations.
 
 ### Recoverable no-data scenarios
 

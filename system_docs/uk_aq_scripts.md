@@ -53,12 +53,14 @@
     - `UK_AQ_BACKFILL_MAX_RUNS_PER_MINUTE` (default `0`, disabled)
     - `UK_AQ_BACKFILL_MAX_RUNS_PER_HOUR` (default `0`, disabled)
   - Existing spacing control still applies via `UK_AQ_BACKFILL_RUN_INTERVAL_SECONDS`.
+  - `UK_AQ_BACKFILL_REBUILD_R2_HISTORY_INDEX` defaults to `true`; set it to `false`
+    to skip the final full R2 history index rebuild after a successful run.
   - Full behavior and merge-mode details are documented in:
     - [`uk-aq-backfill-local.md`](uk-aq-backfill-local.md)
 
 ## History integrity scripts
 
-See [`uk-aq-history-integrity.md`](uk-aq-history-integrity.md) for the full
+See [`uk-aq-r2-history-integrity.md`](uk-aq-r2-history-integrity.md) for the full
 system doc.
 
 ## R2 history backup scripts
@@ -217,6 +219,10 @@ See [`uk-aq-r2-history-dropbox-backup.md`](uk-aq-r2-history-dropbox-backup.md) f
   - Enforces strict mode/output scope mapping:
     - `observs-only` -> `UK_AQ_BACKFILL_RUN_MODE=source_to_r2` + `UK_AQ_BACKFILL_OUTPUT_SCOPE=observations_only`
     - `aqi-only` -> `UK_AQ_BACKFILL_RUN_MODE=r2_history_obs_to_aqilevels` + `UK_AQ_BACKFILL_OUTPUT_SCOPE=aqilevels_only`
+  - Forces `UK_AQ_BACKFILL_REBUILD_R2_HISTORY_INDEX=false` so integrity repairs do
+    not trigger a full-history index rebuild.
+  - After a successful non-dry-run repair, runs one targeted R2 history index update
+    for the affected day range and connector/domain.
 
 ## GCP Secret Manager scripts
 
