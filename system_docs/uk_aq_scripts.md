@@ -25,16 +25,20 @@
   - Supports base-folder scanning and direct-file path overrides.
 
 - `scripts/geography/build_pcon_la_lookup_shards.mjs`
-  - Builds PCON/LA grid shard JSON files and `manifest.json` from detailed GeoJSON boundaries.
-  - Includes each feature in every overlapping tile by bbox and emits approximate adjacency files.
+  - Builds PCON/LA grid shard JSON files, `by_code/` geometry objects, and `manifest.json` from detailed GeoJSON boundaries.
+  - Includes each feature ref in every overlapping tile by bbox, stores full geometry once per code, and emits approximate adjacency files.
+  - Accepts mixed boundary CRS inputs; reprojects `EPSG:27700` geometry to `EPSG:4326` during build so WGS84 tile logic stays valid.
 
 - `scripts/geography/upload_pcon_la_lookup_shards_to_r2.mjs`
-  - Uploads generated geography shard JSON files and manifest to R2.
-  - Uses S3-compatible upload with geo-specific env vars and existing R2 credential fallbacks.
+  - Uploads generated geography shard JSON files, `by_code/` geometry objects, and manifest to R2.
+  - Defaults to geo bucket `uk-aq-pcon-la-lookup`.
+  - Prefers Cloudflare account API-token upload using `UK_AQ_DOMAIN_CLOUDFLARE_ACCOUNT_ID` and `UK_AQ_DOMAIN_CLOUDFLARE_API_TOKEN`.
+  - Falls back to S3-compatible upload only when API-token mode is not configured.
 
-- `scripts/geography/compare_r2_geo_lookup_with_aiven.py`
-  - Runs Layer 1 validation by comparing Aiven/PostGIS PCON/LA lookup with R2 shard lookup for sampled stations.
-  - Produces a JSON mismatch report without modifying station rows.
+- `scripts/geography/validate_r2_geo_lookup_against_stations.py`
+  - Runs Layer 1 validation by comparing stored station PCON/LA codes with the R2 shard lookup for sampled stations.
+  - Use `npm run geo:validate-stations` for the package alias.
+  - Produces a JSON confidence report without modifying station rows.
 
 ## Backfill scripts
 
@@ -133,6 +137,12 @@ See [`uk-aq-r2-history-dropbox-backup.md`](uk-aq-r2-history-dropbox-backup.md) f
     `--max-download-mb`, `--max-runtime-minutes`, `--verbose` to python.
   - Deploys to `/Users/mikehinford/uk-aq-history-integrity/bin/`; in-repo
     location is the source of truth.
+
+- `scripts/uk-aq-history-integrity/bin/uk-aq-aqi-gap-check.py`
+  - Local-only AQI gap checker for missing hourly AQI rows.
+  - Compares expected AQI row presence from local observations against actual local AQI hourly history.
+  - Supports `r2-dropbox` and `db-dump` source modes plus `daily`, `weekly`, `monthly`, and `obsaqidb` profiles.
+  - Writes JSON + markdown reports under `UK_AQ_HISTORY_INTEGRITY_REPORT_DIR/aqi_gap_check/` and stores run summaries in the shared history-integrity SQLite DB.
 
 - `scripts/uk-aq-history-integrity/bin/uk-aq-history-integrity.py`
   - Python entrypoint. Phase 1: env/path guardrails, SQLite schema
