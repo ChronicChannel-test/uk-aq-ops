@@ -68,6 +68,7 @@ Window split behavior:
 - Prefix default: `history/v1/aqilevels`.
 - Reads day manifests first, then connector manifests/files under each day.
 - For the R2 segment, the worker resolves timeseries window context from `uk_aq_public.uk_aq_timeseries_aqi_hourly` (connector id, station id, and window timeseries ids) and narrows scans accordingly.
+- If that ObsAQIDB lookup misses for an R2-only timeseries, the worker still scans R2 directly by timeseries id across day connector manifests instead of returning an empty response.
 - Optional AQI timeseries index fast-path:
   - prefix default: `history/_index/aqilevels_timeseries`
   - index key shape: `day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
@@ -134,6 +135,7 @@ Coverage metadata includes fallback status for the recent window:
 - `coverage.history_scan_complete` / `coverage.history_scan_stopped_reason`: whether the main R2 history scan completed without budget cut-off
 - `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, `skipped_files_by_pollutant`, and warnings)
 - `coverage.aqi_band_cache`: band-cache diagnostics (`enabled`, `prefix`, `eligible_day_count`, `hit_count`, `miss_count`, `write_count`, `skipped_day_count`)
+- `coverage.resolved_connector_id`: connector id discovered from R2 when ObsAQIDB context lookup misses
 - `coverage.obs_aqidb_fallback_used`: whether ObsAQIDB fallback rows were merged
 - `coverage.obs_aqidb_fallback_reason`: currently `r2_recent_missing_or_incomplete` when fallback path runs
 - `coverage.obs_aqidb_fallback_recent_r2_point_count`: R2 hourly point count in the recent fallback window
