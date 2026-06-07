@@ -24,21 +24,9 @@ Read endpoints:
 
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
-  - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now runs R2-first stitching in cache proxy:
-    - fetches older observations history from `UK_AQ_OBSERVS_HISTORY_R2_API_URL` up to the live ingest-retention cutoff
-    - starts the ingest tail one day earlier than that cutoff so the overlap can prefer the older source on shared timestamps
-    - fetches ingest tail/slices from `uk_aq_timeseries` origin
-    - dedupes by `observed_at` with R2-preferred precedence on the overlap window by default
-    - requests fully inside the ingest-retention window short-circuit to the origin payload without an R2 fetch
-  - returns v2 envelope + metadata (`source_mode`, `r2_coverage_end`, `ingest_tail_start`, `has_gap`, row counts)
-  - response headers include:
-    - `X-UK-AQ-Timeseries-Source-Mode`
-    - `X-UK-AQ-R2-Coverage-End`
-    - `X-UK-AQ-Ingest-Tail-Start`
-    - `X-UK-AQ-R2-Rows`
-    - `X-UK-AQ-Ingest-Rows`
-    - `X-UK-AQ-Has-Gap`
-    - `X-UK-AQ-Cache-Key-Version: ts-v2`
+  - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now forwards the stitched origin payload from `uk_aq_timeseries` without re-stitching observations in the cache proxy
+  - the origin edge function owns the ingestdb / obs_aqidb / R2 split for observations
+  - response headers still include the cache key version and the usual cache headers for the returned payload
 - `/api/aq/stations-chart` -> `uk_aq_stations_chart`
 - `/api/aq/stations` -> `uk_aq_stations`
 - `/api/aq/la-hex` -> `uk_aq_la_hex`
