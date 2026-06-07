@@ -25,8 +25,8 @@ Read endpoints:
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
   - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now runs R2-first stitching in cache proxy:
-    - fetches older observations history from `UK_AQ_OBSERVS_HISTORY_R2_API_URL` up to the ingest-retention boundary
-    - starts the ingest tail one day earlier than that boundary so the overlap can prefer the older source on shared timestamps
+    - fetches older observations history from `UK_AQ_OBSERVS_HISTORY_R2_API_URL` up to the live ingest-retention cutoff
+    - starts the ingest tail one day earlier than that cutoff so the overlap can prefer the older source on shared timestamps
     - fetches ingest tail/slices from `uk_aq_timeseries` origin
     - dedupes by `observed_at` with R2-preferred precedence on the overlap window by default
     - requests fully inside the ingest-retention window short-circuit to the origin payload without an R2 fetch
