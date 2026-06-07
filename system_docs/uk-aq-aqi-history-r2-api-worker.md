@@ -48,11 +48,12 @@ Optional:
 
 Window split behavior:
 
-- worker reads R2 first across the full requested range.
-- `INGESTDB_RETENTION_DAYS` (default `5`) defines the recent ObsAQIDB merge window, with a one-day overlap at the cutover.
-- worker calls ObsAQIDB whenever the requested range overlaps that ingest retention window.
+- worker splits the requested range at the ingest retention boundary.
+- older history is read from R2 only.
+- the recent slice is read from ObsAQIDB only.
+- `INGESTDB_RETENTION_DAYS` (default `5`) defines the recent ObsAQIDB slice, with a one-day overlap at the cutover so boundary-day rows still prefer R2 when both sources exist.
 - overlapping timestamps are de-duplicated by hour, with R2 rows winning.
-- if ObsAQIDB fallback fails, R2 results are still returned when available.
+- if ObsAQIDB fallback fails, R2 results are still returned when available for the historical slice.
 - cache TTL is also dynamic by the requested end time:
   - requests ending within the last 24 hours use the short live TTL
   - requests ending more than 24 hours ago use the long immutable-history TTL
