@@ -205,7 +205,7 @@ Freshness buckets (`0-3`, `3-6`, `6-24`, `1-7`, `7+`) are based on `timeseries.l
 
 ## Cloudflare Access Session Expiry Recovery
 
-- Dashboard API fetches (`/api/dashboard`, `/api/storage_coverage`) can fail with browser
+- Dashboard API fetches (`/api/dashboard`, `/api/storage_coverage`, `/api/daily_task_runs`) can fail with browser
   `TypeError: Failed to fetch` + CORS messages when a Cloudflare Access session expires
   after the tab is dormant.
 - The dashboard frontend now treats that failure pattern as an auth-expiry signal and
