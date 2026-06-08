@@ -8,6 +8,7 @@ Daily task health tracks whether expected daily scheduled jobs reported for a UT
 | --- | --- | --- | --- |
 | `ops.prune_daily` | Prune daily | gcp | `uk-aq-ops` |
 | `ops.observs_partition_maintenance` | Observations partition maintenance | gcp | `uk-aq-ops` |
+| `ops.r2_core_snapshot` | R2 core snapshot | github | `uk-aq-ops` |
 | `ingest.stations_daily` | Stations daily | github | `uk-aq-ingest` |
 | `ops.r2_history_dropbox_backup` | R2 history Dropbox backup | github | `uk-aq-ops` |
 | `ops.dropbox_prune_raw` | Dropbox prune raw | github | `uk-aq-ops` |
@@ -83,7 +84,7 @@ from uk_aq_ops.daily_task_status
 where date_utc = current_date;
 ```
 
-GitHub tasks (`ingest.stations_daily`, `ops.r2_history_dropbox_backup`, and `ops.dropbox_prune_raw`) are still Phase 3 and are externally scheduled via Cloudflare Worker cron calling `workflow_dispatch`.
+GitHub tasks (`ops.r2_core_snapshot`, `ingest.stations_daily`, `ops.r2_history_dropbox_backup`, and `ops.dropbox_prune_raw`) are still Phase 3 and are externally scheduled via Cloudflare Worker cron calling `workflow_dispatch`.
 
 ## Phase 3 GitHub Reporting
 
@@ -93,6 +94,7 @@ Instrumented GitHub tasks:
 
 | Task key | Workflow |
 | --- | --- |
+| `ops.r2_core_snapshot` | `uk-aq-ops/.github/workflows/uk_aq_r2_core_snapshot.yml` |
 | `ingest.stations_daily` | `uk-aq-ingest/.github/workflows/uk_aq_stations_daily.yml` |
 | `ops.r2_history_dropbox_backup` | `uk-aq-ops/.github/workflows/uk_aq_r2_history_dropbox_backup.yml` |
 | `ops.dropbox_prune_raw` | `uk-aq-ops/.github/workflows/uk_aq_dropbox_prune_raw.yml` |
@@ -122,14 +124,15 @@ GitHub due times are still controlled by `uk_aq_ops.daily_task_definitions.due_t
 Manual validation:
 
 1. Run `uk_aq_stations_daily.yml` manually via `workflow_dispatch` to test `ingest.stations_daily`.
-2. Run `uk_aq_r2_history_dropbox_backup.yml` manually via `workflow_dispatch` to test `ops.r2_history_dropbox_backup`.
-3. Run `uk_aq_dropbox_prune_raw.yml` manually via `workflow_dispatch` to test `ops.dropbox_prune_raw`.
-4. Query the resulting runs and day status:
+2. Run `uk_aq_r2_core_snapshot.yml` manually via `workflow_dispatch` to test `ops.r2_core_snapshot`.
+3. Run `uk_aq_r2_history_dropbox_backup.yml` manually via `workflow_dispatch` to test `ops.r2_history_dropbox_backup`.
+4. Run `uk_aq_dropbox_prune_raw.yml` manually via `workflow_dispatch` to test `ops.dropbox_prune_raw`.
+5. Query the resulting runs and day status:
 
 ```sql
 select *
 from uk_aq_ops.daily_task_runs
-where task_key in ('ingest.stations_daily', 'ops.r2_history_dropbox_backup', 'ops.dropbox_prune_raw')
+where task_key in ('ops.r2_core_snapshot', 'ingest.stations_daily', 'ops.r2_history_dropbox_backup', 'ops.dropbox_prune_raw')
 order by created_at desc
 limit 20;
 

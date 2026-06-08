@@ -14,6 +14,8 @@ GitHub workflow:
 
 - `.github/workflows/uk_aq_r2_core_snapshot.yml`
 
+The workflow reports daily task health under `ops.r2_core_snapshot` with `Started`, `Finished`, and `Failed` lifecycle updates.
+
 Intended schedule:
 
 - `04:15 UTC` daily via external Cloudflare Worker scheduler (`workflow_dispatch`).
@@ -48,6 +50,9 @@ The script:
 3. Computes SHA-256 hashes for compressed payloads (plus uncompressed hash metadata).
 4. Builds `checksums.sha256` and `manifest.json` with totals and table metadata.
 5. Skips R2 writes when the new `manifest_hash` matches the existing manifest for the day.
+6. Retries the database export phase on transient connection/cursor failures before giving up.
+
+R2 reads and writes already use the shared `workers/shared/r2_sigv4.mjs` retry logic for transient HTTP and request failures.
 
 ## Default table set
 
