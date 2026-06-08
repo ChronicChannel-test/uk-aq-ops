@@ -25,7 +25,8 @@ Read endpoints:
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
   - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now forwards the stitched origin payload from `uk_aq_timeseries` without re-stitching observations in the cache proxy
-  - the origin edge function owns the ingestdb / obs_aqidb / R2 split for observations
+  - the origin edge function owns the observation source split: ingestdb for the retention range, R2-preferred plus ingestdb missing-hour fill for the one-day overlap, and R2-only for historical ranges
+  - the proxy does not use ObsAQIDB for observation line data
   - response headers still include the cache key version and the usual cache headers for the returned payload
 - `/api/aq/stations-chart` -> `uk_aq_stations_chart`
 - `/api/aq/stations` -> `uk_aq_stations`
