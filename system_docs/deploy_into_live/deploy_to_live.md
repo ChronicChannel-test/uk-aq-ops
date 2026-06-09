@@ -507,8 +507,8 @@ rclone copy \
   --progress --transfers 8
 
 rclone copy \
-  uk_aq_r2_test:uk-aq-history-cic-test/history/v1/aqilevels \
-  uk_aq_r2_live:uk-aq-history-live/history/v1/aqilevels \
+  uk_aq_r2_test:uk-aq-history-cic-test/history/v1/aqilevels/hourly \
+  uk_aq_r2_live:uk-aq-history-live/history/v1/aqilevels/hourly \
   --progress --transfers 8
 ```
 

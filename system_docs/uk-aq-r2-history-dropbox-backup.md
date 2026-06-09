@@ -148,7 +148,7 @@ Dropbox root (example):
 Mirrored domain paths:
 
 - `history/v1/observations/day_utc=YYYY-MM-DD/...`
-- `history/v1/aqilevels/day_utc=YYYY-MM-DD/...`
+- `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/...`
 - `history/v1/core/day_utc=YYYY-MM-DD/...`
 
 Mirrored derived index files:
@@ -319,7 +319,7 @@ Variables:
 - `CFLARE_R2_BUCKET`
 - `CFLARE_R2_REGION` (default `auto`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
-- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
@@ -468,7 +468,7 @@ Workflow dispatch inputs:
 - `restore_observations`:
   - Include `history/v1/observations`.
 - `restore_aqilevels`:
-  - Include `history/v1/aqilevels`.
+  - Include `history/v1/aqilevels/hourly`.
 - `restore_core`:
   - Include `history/v1/core`.
 

@@ -24,7 +24,7 @@ Bucket key is:
 - Observations source rows are streamed through server-side projection function `uk_aq_ops.uk_aq_phase_b_history_rows` by `(day_utc, connector_id)` and written to R2 Parquet with ZSTD compression.
 - Observations part rollover defaults to `1,000,000` rows per file.
 - Observations write each part directly to committed prefix (`history/v1/observations/...`) and persist resume checkpoint state after each part so retries continue from the last committed tuple instead of re-reading full-day rows.
-- AQI levels are exported in the same run for completed observation days that are missing AQI day manifests; AQI rows are streamed from `uk_aq_aqilevels.timeseries_aqi_hourly` grouped by connector and written to `history/v1/aqilevels/...`.
+- AQI levels are exported in the same run for completed observation days that are missing AQI day manifests; AQI rows are streamed from `uk_aq_aqilevels.timeseries_aqi_hourly` grouped by connector and written to `history/v1/aqilevels/hourly/...`.
 - AQI export preserves rows where `station_id` is null (instead of dropping them), so connector/day row-count validation stays aligned with source RPC totals.
 - Phase B writes manifests, verifies object existence, and updates:
   - `uk_aq_ops.history_candidates`
@@ -197,7 +197,7 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_STAGING_RETENTION_DAYS` (default `7`)
 - `UK_AQ_R2_HISTORY_STAGING_PREFIX` (default `history/v1/_ops/observations/staging`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
-- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX` (default `history/_index/observations_timeseries`)

@@ -37,7 +37,7 @@ Known bucket env/config names from the R2 layout docs:
 
 ```text
 history/v1/observations
-history/v1/aqilevels
+history/v1/aqilevels/hourly
 history/v1/core
 history/_index
 ```
@@ -245,9 +245,9 @@ Top-level fields:
 ## Object paths
 
 ```text
-history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet
-history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
-history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json
+history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parquet
+history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
+history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json
 ```
 
 ## AQI levels parquet schema
@@ -298,7 +298,7 @@ Incorrect: daqi_pm25_index_level
 Path:
 
 ```text
-history/v1/aqilevels/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
+history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
 ```
 
 Top-level fields:
@@ -347,7 +347,7 @@ Top-level fields:
 Path:
 
 ```text
-history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json
+history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json
 ```
 
 Top-level fields:
@@ -399,7 +399,7 @@ Top-level fields:
 The AQI history API worker reads from:
 
 ```text
-history/v1/aqilevels
+history/v1/aqilevels/hourly
 ```
 
 and can merge recent fallback rows from:
@@ -719,7 +719,7 @@ FROM read_parquet(
 ```sql
 DESCRIBE SELECT *
 FROM read_parquet(
-  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=*/connector_id=*/*.parquet',
+  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=*/connector_id=*/*.parquet',
   union_by_name = true
 );
 ```
@@ -730,8 +730,8 @@ FROM read_parquet(
 CREATE OR REPLACE VIEW r2_aqilevels_mar_apr_2026 AS
 SELECT *
 FROM read_parquet([
-  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-03-*/connector_id=*/*.parquet',
-  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-04-*/connector_id=*/*.parquet'
+  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-03-*/connector_id=*/*.parquet',
+  '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-04-*/connector_id=*/*.parquet'
 ], union_by_name = true);
 ```
 
@@ -741,8 +741,8 @@ FROM read_parquet([
 WITH src AS (
   SELECT *
   FROM read_parquet([
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-03-*/connector_id=*/*.parquet',
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-04-*/connector_id=*/*.parquet'
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-03-*/connector_id=*/*.parquet',
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-04-*/connector_id=*/*.parquet'
   ], union_by_name = true)
   WHERE station_id = 1575
     AND timeseries_id = 354
@@ -791,8 +791,8 @@ ORDER BY timestamp_hour_utc;
 WITH src AS (
   SELECT *
   FROM read_parquet([
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-03-*/connector_id=*/*.parquet',
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-04-*/connector_id=*/*.parquet'
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-03-*/connector_id=*/*.parquet',
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-04-*/connector_id=*/*.parquet'
   ], union_by_name = true)
   WHERE station_id = 1575
     AND timeseries_id = 354
@@ -844,8 +844,8 @@ WITH src AS (
     COALESCE(daqi_pm25_rolling24h_index_level, daqi_index_level) AS resolved_daqi_for_pm25,
     COALESCE(eaqi_pm25_index_level, eaqi_index_level) AS resolved_eaqi_for_pm25
   FROM read_parquet([
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-03-*/connector_id=*/*.parquet',
-    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/day_utc=2026-04-*/connector_id=*/*.parquet'
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-03-*/connector_id=*/*.parquet',
+    '/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/aqilevels/hourly/day_utc=2026-04-*/connector_id=*/*.parquet'
   ], union_by_name = true)
   WHERE station_id = 1575
     AND timeseries_id = 354

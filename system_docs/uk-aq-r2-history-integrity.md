@@ -1646,7 +1646,7 @@ upstream archive contains.
 - Connector/days already queued with `obs_repaired` in the current run
   are skipped from AQI-only queueing to avoid duplicate rebuild work.
 - AQI health checks are connector/day-oriented and inspect local Dropbox
-  R2 AQI connector manifests under `history/v1/aqilevels/...`:
+  R2 AQI connector manifests under `history/v1/aqilevels/hourly/...`:
   - manifest missing
   - manifest stale (schema/writer metadata mismatch or invalid manifest)
   - manifest empty (`source_row_count`/`total_rows` zero while source

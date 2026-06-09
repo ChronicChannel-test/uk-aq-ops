@@ -25,7 +25,7 @@ The restored history files contain numeric IDs, so the live core tables must pre
 
 1. Populate the live core DB tables from the source/test dataset, preserving IDs (`populate-live-core-db-from-test.md`).
 2. Populate `history/v1/core` in live R2.
-3. Restore `history/v1/observations` and `history/v1/aqilevels` from Dropbox into the live R2 bucket.
+3. Restore `history/v1/observations` and `history/v1/aqilevels/hourly` from Dropbox into the live R2 bucket.
 4. Rebuild the live `history/_index` manifests.
 5. Validate a few days/connectors before exposing the live history endpoints.
 
@@ -141,7 +141,7 @@ After the restore:
 
 - Confirm the destination R2 bucket contains day manifests under:
   - `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
-  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+  - `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json`
 - Confirm the index rebuild wrote:
   - `history/_index/observations_latest.json`
   - `history/_index/aqilevels_latest.json`
@@ -154,7 +154,7 @@ After the restore:
 
 - The Dropbox restore source must preserve the exact mirrored folder structure from the backup:
   - `history/v1/observations/...`
-  - `history/v1/aqilevels/...`
+  - `history/v1/aqilevels/hourly/...`
   - `history/v1/core/...`
 - Prefix env vars must match the actual backup layout:
   - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX`

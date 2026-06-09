@@ -8,7 +8,7 @@ Deploy workflow: `.github/workflows/uk_aq_aqi_history_r2_api_worker_deploy.yml`
 
 Cloudflare Worker for timeseries AQI history reads, stitched from:
 
-- primary source: R2 backups (`history/v1/aqilevels`)
+- primary source: R2 backups (`history/v1/aqilevels/hourly`)
 - fallback/repair source for recent gaps: `obs_aqidb` (`uk_aq_public.uk_aq_timeseries_aqi_hourly`)
 
 This is intended for website DAQI/EAQI charts where recent AQI is not yet exported to R2.
@@ -68,7 +68,7 @@ Window split behavior:
 ## R2 requirements
 
 - Bucket binding: `UK_AQ_HISTORY_BUCKET`.
-- Prefix default: `history/v1/aqilevels`.
+- Prefix default: `history/v1/aqilevels/hourly`.
 - Reads day manifests first, then connector manifests/files under each day.
 - For the R2 segment, the worker resolves timeseries window context from `uk_aq_public.uk_aq_timeseries_aqi_hourly` (connector id, station id, and window timeseries ids) and narrows scans accordingly.
 - If that ObsAQIDB lookup misses for an R2-only timeseries, the worker still scans R2 directly by timeseries id across day connector manifests instead of returning an empty response.
@@ -81,7 +81,7 @@ Window split behavior:
 - AQI parquet reads use `timeseries_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-timeseries requests.
 - Day-level R2 scans are processed newest-first so when scan budgets are hit, recent overlap near the live split is prioritized over older history.
 - Immutable day AQI band objects are cached in R2 under:
-  - `history/v1/aqilevels/bands/v1/day_utc=YYYY-MM-DD/connector_id=NN/timeseries_ids=.../pollutant=all|pm25|pm10|no2.json`
+  - `history/v1/aqilevels/hourly/bands/v1/day_utc=YYYY-MM-DD/connector_id=NN/timeseries_ids=.../pollutant=all|pm25|pm10|no2.json`
   - cache reads are only used for full-day immutable windows
   - writes are queued with `ctx.waitUntil()` after a clean scan of a full-day immutable window completes
 
@@ -104,7 +104,7 @@ Variables:
 
 ## Runtime vars (wrangler defaults)
 
-- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX=history/v1/aqilevels`
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX=history/v1/aqilevels/hourly`
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX=history/_index`
 - `UK_AQ_AQI_HISTORY_R2_TIMESERIES_INDEX_PREFIX=history/_index/aqilevels_timeseries`
 - `UK_AQ_AQI_HISTORY_R2_TIMESERIES_INDEX_ENABLED=true`

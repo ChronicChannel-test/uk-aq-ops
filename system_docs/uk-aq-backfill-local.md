@@ -218,9 +218,9 @@ same-run integrity SOS snapshots at:
 
 - connector/day parquet + connector manifests under:
   - `history/v1/observations/...`
-  - `history/v1/aqilevels/...`
+  - `history/v1/aqilevels/hourly/...`
 - day manifests:
   - `history/v1/observations/day_utc=YYYY-MM-DD/manifest.json`
-  - `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+  - `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json`
 - local logs under `UK_AQ_BACKFILL_LOCAL_LOG_DIR`
 - optional ledger rows (when enabled)

@@ -56,6 +56,7 @@ In ingest DB, `pg_cron` runs helper computation hourly at `:10`:
   - use `> start AND <= end` hour-end windowing
 
 This writes `uk_aq_aqilevels.timeseries_aqi_hourly_helper` in ingest DB.
+Helper rows now include only the normalized DAQI and EAQI inputs, counts, statuses, and index levels so the downstream worker can consume the normalized contract directly.
 Helper cleanup runs in the same ingest tick via `uk_aq_rpc_timeseries_aqi_hourly_helper_cleanup` with default retention `21` days unless explicitly overridden.
 
 ## Cloud Scheduler Trigger
@@ -100,6 +101,7 @@ Behavior by mode:
 
 - `sync_hourly`:
   - read the existing ingest helper window via `uk_aq_rpc_timeseries_aqi_hourly_helper_window`
+  - the helper window returns the normalized DAQI/EAQI fields only
   - reuse `uk_aq_rpc_timeseries_aqi_hourly_upsert` with the existing chunking and retry behavior
 - `reconcile_short` and `reconcile_deep`:
   - first rebuild the ingest helper window from raw observations via `uk_aq_rpc_timeseries_aqi_hourly_helper_upsert`

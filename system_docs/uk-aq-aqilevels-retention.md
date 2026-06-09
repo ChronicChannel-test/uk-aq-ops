@@ -8,7 +8,7 @@ This deploys a dedicated Cloud Run service that enforces rolling retention for `
 - compute strict UTC-day cutoff (keeps the last `OBS_AQIDB_AQILEVELS_RETENTION_DAYS` full UTC days)
 - fetch day-level cleanup candidates older than cutoff
 - check committed R2 History manifest before each drop:
-  - HEAD `history/v1/aqilevels/day_utc=YYYY-MM-DD/manifest.json`
+  - HEAD `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json`
 - delete only confirmed complete days from:
   - `uk_aq_aqilevels.timeseries_aqi_hourly`
   - `uk_aq_aqilevels.timeseries_aqi_daily`
@@ -34,7 +34,7 @@ Cloudflare R2 history-check configuration:
 - `CFLARE_R2_ACCESS_KEY_ID` (or `R2_ACCESS_KEY_ID`)
 - `CFLARE_R2_SECRET_ACCESS_KEY` (or `R2_SECRET_ACCESS_KEY`)
 - `CFLARE_R2_REGION` (or `R2_REGION`, default `auto`)
-- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels`)
+- `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
 
 ## Local run
 
