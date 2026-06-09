@@ -29,6 +29,8 @@ Optional:
 
 - `scope` (must be `timeseries`; default `timeseries`)
 - `grain` (must be `hourly`; default `hourly`)
+- `pollutant` (`pm25`, `pm10`, `no2`)
+  - when present, the worker returns only rows for that pollutant_code
 - `format`
   - default `compact` JSON with `columns` + compact `points` arrays
   - `json` is accepted as an alias for compact JSON
@@ -42,9 +44,6 @@ Optional:
   - alias: `since`
 - `row_limit` (`1..20000`)
   - alias: `limit`
-- `pollutant` (`pm25`, `pm10`, `no2`)
-  - when present, the generic `daqi_index_level` / `eaqi_index_level` fields in each point are set from that pollutant only
-  - pollutant-specific AQI columns are always returned in each point for explicit client-side mapping
 
 Window split behavior:
 
@@ -54,7 +53,7 @@ Window split behavior:
   - historical range (older than the overlap): R2 only
 - R2 is requested only up to the rolling retention start, never for the retention source window.
 - ObsAQIDB is queried only when the requested range overlaps the one-day overlap or retention range.
-- overlapping timestamps are de-duplicated by hour, with R2 rows winning.
+- overlapping row keys (`period_start_utc` + `timeseries_id` + `pollutant_code`) are de-duplicated with R2 rows winning.
 - if ObsAQIDB fallback fails, R2 results are still returned when available for the historical slice.
 - cache TTL is also dynamic by the requested end time:
   - requests ending within the last 24 hours use the short live TTL
@@ -80,10 +79,7 @@ Window split behavior:
   - missing/invalid index entries fall back to connector manifest scanning.
 - AQI parquet reads use `timeseries_id` row-group stats plus chunked column reads so the worker does not materialize whole parquet files for single-timeseries requests.
 - Day-level R2 scans are processed newest-first so when scan budgets are hit, recent overlap near the live split is prioritized over older history.
-- Immutable day AQI band objects are cached in R2 under:
-  - `history/v1/aqilevels/hourly/bands/v1/day_utc=YYYY-MM-DD/connector_id=NN/timeseries_ids=.../pollutant=all|pm25|pm10|no2.json`
-  - cache reads are only used for full-day immutable windows
-  - writes are queued with `ctx.waitUntil()` after a clean scan of a full-day immutable window completes
+- Legacy hourly AQI band-cache objects under `history/v1/aqilevels/hourly/bands/v1/...` are no longer read or written by this worker; the live API serves normalized rows directly from R2 plus the ObsAQIDB retention fallback.
 
 ## Required GitHub env/secret targets
 
@@ -144,7 +140,7 @@ Coverage metadata includes fallback status for the recent window:
 - `coverage.target_timeseries_id_count`: number of timeseries ids used for AQI index filtering
 - `coverage.history_scan_complete` / `coverage.history_scan_stopped_reason`: whether the main R2 history scan completed without budget cut-off
 - `coverage.timeseries_index`: AQI index diagnostics for the main history segment (`enabled`, `prefix`, `hit_count`, `miss_count`, `skipped_days_by_file_range`, `skipped_files_by_pollutant`, and warnings)
-- `coverage.aqi_band_cache`: band-cache diagnostics (`enabled`, `prefix`, `eligible_day_count`, `hit_count`, `miss_count`, `write_count`, `skipped_day_count`)
+- `coverage.row_summary`: returned-row diagnostics (`parsed_point_count`, `null_daqi_count`, `null_eaqi_count`, `source_counts`, `source_coverage_counts`, `pollutant_counts`, and calculation-status / missing-reason counts)
 - `coverage.resolved_connector_id`: connector id discovered from R2 when ObsAQIDB context lookup misses
 - `coverage.obs_aqidb_fallback_used`: whether ObsAQIDB fallback rows were merged
 - `coverage.obs_aqidb_fallback_reason`: `overlap_missing_hour_fill_and_retention` when the deterministic ObsAQIDB merge window is queried
@@ -164,22 +160,26 @@ Default `format=compact` JSON returns `columns` plus compact `points[]` arrays. 
 Each row object includes:
 
 - `period_start_utc`
-- `timeseries_id`
+- `connector_id`
 - `station_id`
-- generic AQI fields:
-  - `daqi_index_level`
-  - `eaqi_index_level`
-- pollutant-specific AQI fields:
-  - `daqi_no2_index_level`
-  - `daqi_pm25_rolling24h_index_level`
-  - `daqi_pm10_rolling24h_index_level`
-  - `eaqi_no2_index_level`
-- `eaqi_pm25_index_level`
-- `eaqi_pm10_index_level`
+- `timeseries_id`
+- `pollutant_code`
+- `daqi_index_level`
+- `eaqi_index_level`
+- `daqi_input_value_ugm3`
+- `daqi_input_averaging_code`
+- `eaqi_input_value_ugm3`
+- `eaqi_input_averaging_code`
+- `daqi_calculation_status`
+- `eaqi_calculation_status`
+- `source`
+- `source_coverage`
 
-When `pollutant` is omitted, the generic pair remains the max-across-supported-pollutants summary for backward compatibility. New chart clients should read the pollutant-specific fields directly.
+The response returns one row per pollutant per hour. When `pollutant` is omitted, all pollutant rows are returned for the timeseries. When `pollutant` is set, rows are filtered to that pollutant_code.
+
+`source` is `r2` or `obs_aqidb`. `source_coverage` is `historical`, `overlap`, or `retention`.
 
 Implementation note:
 
-- R2 parquet reads are now based on normalized AQI rows (`pollutant_code`, `daqi_index_level`, `eaqi_index_level`).
-- Pollutant-specific response fields remain available and are derived/aggregated at read time for compatibility.
+- R2 parquet reads are based on normalized AQI rows (`pollutant_code`, `timestamp_hour_utc`, `daqi_input_*`, `eaqi_input_*`, `*_calculation_status`, and the row-level AQI index fields).
+- The live response path no longer depends on the old wide pollutant-specific AQI fields.
