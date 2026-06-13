@@ -24,7 +24,7 @@ Diagnostics endpoints:
 
 - `POST /api/aq/debug-log`
   - accepts structured website debug payloads from `hex_map.html` only after normal origin/session validation
-  - uploads JSON server-side to Dropbox under `error_logs/YYYY-MM-DD/`
+  - uploads JSON server-side to Dropbox under `error_log/YYYY-MM-DD/`
   - normalizes filenames as `uk_aq_error_hex_map_html_YYYYMMDDTHHMMSSZ_<shortid>.json`
   - keeps Dropbox app credentials in the Worker only; the browser receives no Dropbox secrets
 
@@ -98,7 +98,7 @@ Variables:
 - `UK_AQ_WEBSITE_DEBUG_LOG_ENABLED` (website build variable; optional; default `false`)
 - `UK_AQ_WEBSITE_DEBUG_LOG_MAX_BODY_BYTES` (Worker variable; optional; default `262144`, clamped `4096`-`1048576`)
 - `UK_AQ_DROPBOX_ROOT` (optional; root folder for Dropbox uploads, e.g. `/CIC-Test`)
-- `UK_AIR_ERROR_DROPBOX_FOLDER` (optional; normalized to `error_logs` for website debug uploads)
+- `UK_AIR_ERROR_DROPBOX_FOLDER` (optional; normalized to `error_log` for website debug uploads)
 
 Secrets:
 
