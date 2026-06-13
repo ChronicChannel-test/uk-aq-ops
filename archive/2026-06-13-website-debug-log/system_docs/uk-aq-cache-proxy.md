@@ -20,14 +20,6 @@ Session endpoints:
 - `POST /api/aq/session/start`
 - `POST /api/aq/session/end`
 
-Diagnostics endpoints:
-
-- `POST /api/aq/debug-log`
-  - accepts structured website debug payloads from `hex_map.html` only after normal origin/session validation
-  - uploads JSON server-side to Dropbox under `error_logs/YYYY-MM-DD/`
-  - normalizes filenames as `uk_aq_error_hex_map_html_YYYYMMDDTHHMMSSZ_<shortid>.json`
-  - keeps Dropbox app credentials in the Worker only; the browser receives no Dropbox secrets
-
 Read endpoints:
 
 - `/api/aq/latest` -> `uk_aq_latest`
@@ -95,10 +87,6 @@ Variables:
 - `UK_AQ_TIMESERIES_STALE_IF_ERROR_SECONDS` (optional; default `300`)
 - `UK_AQ_TIMESERIES_R2_MANIFEST_URL` (optional diagnostics)
 - `UK_AQ_TIMESERIES_R2_INDEX_URL` (optional diagnostics)
-- `UK_AQ_WEBSITE_DEBUG_LOG_ENABLED` (website build variable; optional; default `false`)
-- `UK_AQ_WEBSITE_DEBUG_LOG_MAX_BODY_BYTES` (Worker variable; optional; default `262144`, clamped `4096`-`1048576`)
-- `UK_AQ_DROPBOX_ROOT` (optional; root folder for Dropbox uploads, e.g. `/CIC-Test`)
-- `UK_AIR_ERROR_DROPBOX_FOLDER` (optional; normalized to `error_logs` for website debug uploads)
 
 Secrets:
 
@@ -109,9 +97,6 @@ Secrets:
 - `UK_AQ_EDGE_UPSTREAM_SECRET`
 - `UK_AQ_CACHE_BYPASS_SECRET`
 - `UK_AQ_TURNSTILE_SECRET_KEY`
-- `DROPBOX_APP_KEY`
-- `DROPBOX_APP_SECRET`
-- `DROPBOX_REFRESH_TOKEN`
 
 Cloudflare account variable:
 
