@@ -51,11 +51,7 @@ Shape (abbreviated):
   "version": 1,
   "kind": "uk_aq_r2_history_backup_inventory",
   "generated_at": "2026-05-15T12:00:00.000Z",
-  "source": {
-    "index_prefix": "history/_index",
-    "index_v2_prefix": "history/_index_v2",
-    "domain_prefixes": {...}
-  },
+  "source": { "index_prefix": "history/_index", "domain_prefixes": {...} },
   "domains": {
     "observations": {
       "days": {
@@ -80,9 +76,7 @@ Shape (abbreviated):
     "observations_latest": { "unit_type": "file", "relative_path": "...", "hash": "...", "size": N, "r2_md5": "...", "r2_modtime": "..." },
     "aqilevels_latest": {...},
     "observations_timeseries_latest": {...},
-    "aqilevels_timeseries_latest": {...},
-    "observations_timeseries_v2_latest": {...},
-    "aqilevels_hourly_data_timeseries_v2_latest": {...}
+    "aqilevels_timeseries_latest": {...}
   },
   "index_tree_units": {
     "observations_timeseries": {
@@ -90,13 +84,7 @@ Shape (abbreviated):
         "day_utc=2026-05-10/connector_id=6/manifest.json": { "unit_type": "file", "relative_path": "...", "hash": "...", ... }
       }
     },
-    "aqilevels_timeseries": { "units": {...} },
-    "observations_timeseries_v2": {
-      "units": {
-        "day_utc=2026-05-10/connector_id=6/pollutant_code=pm25/manifest.json": { "unit_type": "file", "relative_path": "...", "hash": "...", ... }
-      }
-    },
-    "aqilevels_hourly_data_timeseries_v2": { "units": {...} }
+    "aqilevels_timeseries": { "units": {...} }
   },
   "summary": { "domain_day_count": {...}, "index_file_count": 4, "index_tree_unit_count": {...} }
 }
@@ -125,8 +113,6 @@ The first build is unavoidably slow (full scan of every manifest). Steady-state 
 The R2 history index rebuilder ([workers/shared/uk_aq_r2_history_index.mjs](../workers/shared/uk_aq_r2_history_index.mjs)) is invoked by `uk_aq_prune_daily` (Cloud Run, 02:00 UTC daily) after every successful Phase B run. It rewrites:
 - per-`(day, connector)` tree-unit manifests under `history/_index/{observations,aqilevels}_timeseries/day_utc=…/connector_id=…/manifest.json`
 - the four aggregate root index files: `history/_index/{observations,aqilevels}.json` and `history/_index/{observations,aqilevels}_timeseries_latest.json`
-- when v2 indexes are explicitly built, per-`(day, connector, pollutant)` tree-unit manifests under `history/_index_v2/{observations_timeseries,aqilevels_hourly_data_timeseries}/day_utc=…/connector_id=…/pollutant_code=…/manifest.json`
-- when present, the two v2 latest files: `history/_index_v2/observations_timeseries_latest.json` and `history/_index_v2/aqilevels_hourly_data_timeseries_latest.json`
 
 This is a different "build" from the **inventory build** that runs inside the Dropbox backup workflow itself — the index rebuild produces R2 objects; the inventory build observes them. They share no code path. If you're confused which one is misbehaving, look at the output path: `_index/*` = index rebuild (in prune); `_index/backup_inventory_v1.json` = inventory build (in Dropbox backup workflow).
 
@@ -173,10 +159,6 @@ Mirrored derived index files:
 - `history/_index/aqilevels_timeseries_latest.json`
 - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 - `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
-- `history/_index_v2/observations_timeseries_latest.json`
-- `history/_index_v2/aqilevels_hourly_data_timeseries_latest.json`
-- `history/_index_v2/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json`
-- `history/_index_v2/aqilevels_hourly_data_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json`
 
 Checkpoint path (default):
 
@@ -235,7 +217,6 @@ CLI:
 --inventory-rel-path <path>          default history/_index/backup_inventory_v1.json
 --domain <name>                      observations | aqilevels | core (repeatable; default all)
 --index-prefix <prefix>              default history/_index
---index-v2-prefix <prefix>           default history/_index_v2
 --rclone-bin <name>                  default rclone
 --report-out <file>                  write JSON report to file
 --dry-run                            build/validate only; do not upload
@@ -246,8 +227,8 @@ Behaviour:
 
 1. Loads the previous inventory from R2 (skipped on `--full-rebuild` or first run; any unreadable previous inventory is silently treated as "no previous").
 2. For each selected domain, `rclone lsjson --recursive` enumerates every `day_utc=*/manifest.json`. For each: if etag+size matches the previous inventory entry, reuse verbatim; otherwise `rclone cat` it, SHA-256 the bytes, extract `file_count`/`total_bytes`/`source_row_count`.
-3. Same etag-skip pattern for v1 `*_latest.json` index files and v2 `_index_v2/*_latest.json` files when present.
-4. Same etag-skip pattern for v1 per-`(day, connector)` manifests under `history/_index/observations_timeseries/` and `history/_index/aqilevels_timeseries/`, plus v2 per-`(day, connector, pollutant)` manifests under `_index_v2` when present.
+3. Same etag-skip pattern for the four `*_latest.json` index files.
+4. Same etag-skip pattern for per-`(day, connector)` manifests under `history/_index/observations_timeseries/` and `history/_index/aqilevels_timeseries/`.
 5. Writes deterministic JSON, uploads via `rclone copyto` from a temp file unless `--dry-run`.
 6. Defensive guard: the inventory's own path is excluded from all scans so it can never include itself.
 
@@ -341,7 +322,6 @@ Variables:
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
-- `UK_AQ_R2_HISTORY_INDEX_V2_PREFIX` (default `history/_index_v2`)
 - `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
 - `UK_AQ_R2_HISTORY_DROPBOX_DIR` (default `R2_history_backup`)
 - `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (default `_ops/checkpoints/r2_history_backup_state_v1.json`)

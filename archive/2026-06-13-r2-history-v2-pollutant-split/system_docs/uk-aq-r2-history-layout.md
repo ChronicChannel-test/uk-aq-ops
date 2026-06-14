@@ -33,7 +33,6 @@ history/v1/observations
 history/v1/aqilevels/hourly
 history/v1/core
 history/_index
-history/_index_v2
 ```
 
 ## Operational prefixes
@@ -60,19 +59,6 @@ history/
       day_utc=YYYY-MM-DD/
         connector_id=<id>/
           manifest.json
-  _index_v2/
-    observations_timeseries_latest.json
-    aqilevels_hourly_data_timeseries_latest.json
-    observations_timeseries/
-      day_utc=YYYY-MM-DD/
-        connector_id=<id>/
-          pollutant_code=<pollutant>/
-            manifest.json
-    aqilevels_hourly_data_timeseries/
-      day_utc=YYYY-MM-DD/
-        connector_id=<id>/
-          pollutant_code=<pollutant>/
-            manifest.json
   v1/
     observations/
       day_utc=YYYY-MM-DD/
@@ -119,16 +105,6 @@ history/v1/observations/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
 history/v1/observations/day_utc=YYYY-MM-DD/manifest.json
 ```
 
-R2 history v2 observations are written alongside v1 only when
-`UK_AQ_R2_HISTORY_WRITE_VERSION=v2`:
-
-```text
-history/v2/observations/day_utc=YYYY-MM-DD/manifest.json
-history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
-history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json
-history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/part-00000.parquet
-```
-
 ## Observations parquet schema
 
 Metadata:
@@ -148,17 +124,6 @@ Columns, in writer order:
 | 2 | `timeseries_id` | INTEGER | Written from `Int32Array` |
 | 3 | `observed_at` | TIMESTAMP | Written from JavaScript `Date` |
 | 4 | `value` | DOUBLE | Numeric measurement value, nullable |
-
-R2 history v2 observation columns:
-
-```text
-connector_id
-station_id
-timeseries_id
-pollutant_code
-observed_at_utc
-value
-```
 
 Legacy writer schema V1, archived/older only:
 
@@ -278,60 +243,6 @@ history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/part-xxxxx.parq
 history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
 history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json
 ```
-
-R2 history v2 AQI hourly paths are split by profile and pollutant:
-
-```text
-history/v2/aqilevels/hourly/data/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json
-history/v2/aqilevels/hourly/data/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/part-00000.parquet
-history/v2/aqilevels/hourly/debug/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json
-history/v2/aqilevels/hourly/debug/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/part-00000.parquet
-```
-
-R2 history v2 AQI hourly `data` columns:
-
-```text
-connector_id
-station_id
-timeseries_id
-pollutant_code
-timestamp_hour_utc
-daqi_index_level
-eaqi_index_level
-daqi_calculation_status
-daqi_missing_reason
-eaqi_calculation_status
-eaqi_missing_reason
-```
-
-R2 history v2 AQI hourly `debug` columns:
-
-```text
-connector_id
-station_id
-timeseries_id
-pollutant_code
-timestamp_hour_utc
-daqi_input_value_ugm3
-daqi_input_averaging_code
-daqi_index_level
-daqi_source_observation_count
-daqi_required_observation_count
-daqi_calculation_status
-daqi_missing_reason
-eaqi_input_value_ugm3
-eaqi_input_averaging_code
-eaqi_index_level
-eaqi_source_observation_count
-eaqi_required_observation_count
-eaqi_calculation_status
-eaqi_missing_reason
-hourly_sample_count
-algorithm_version
-computed_at_utc
-```
-
-The v2 debug schema does not include old wide compatibility fields. Keep those in v1 only unless a validation script proves they are still required.
 
 ## AQI levels parquet schema
 
@@ -742,94 +653,6 @@ Per-connector AQI index manifest fields:
 | `bytes` | integer |
 | `etag_or_hash` | string/null |
 | `pollutant_codes` | string[] |
-
-## R2 history v2 pollutant timeseries indexes
-
-The v2 index builder is explicit: run
-`scripts/backup_r2/uk_aq_build_r2_history_index.mjs --history-version v2`.
-It does not change v1 runtime readers or v1 index paths.
-
-Latest descriptor paths:
-
-```text
-history/_index_v2/observations_timeseries_latest.json
-history/_index_v2/aqilevels_hourly_data_timeseries_latest.json
-```
-
-Per-pollutant index paths:
-
-```text
-history/_index_v2/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json
-history/_index_v2/aqilevels_hourly_data_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json
-```
-
-The index is built from v2 data manifests only:
-
-- observations data: `history/v2/observations`
-- AQI hourly compact data: `history/v2/aqilevels/hourly/data`
-
-No debug AQI v2 indexes are built under `_index_v2`.
-
-Latest descriptor fields:
-
-| Field | Type |
-|---|---|
-| `schema_version` | integer, `2` |
-| `generated_at` | timestamp string, data-driven |
-| `source` | string, `r2_pollutant_manifests` |
-| `history_version` | string, `v2` |
-| `domain` | string, `observations` or `aqilevels` |
-| `grain` | string/null, `hourly` for AQI |
-| `profile` | string/null, `data` for AQI |
-| `index_kind` | string, `timeseries_file_ranges` |
-| `bucket` | string |
-| `data_prefix` | string |
-| `index_prefix` | string |
-| `min_day_utc` | string date/null |
-| `max_day_utc` | string date/null |
-| `day_count` | integer |
-| `connector_index_count` | integer |
-| `pollutant_index_count` | integer |
-| `file_count` | integer |
-| `indexed_file_count` | integer |
-| `days` | string[] |
-| `key_layout.pollutant_index_manifest_key_template` | string |
-| `key_layout.latest_key` | string |
-| `day_summaries` | object[] |
-
-Per-pollutant index manifest fields:
-
-| Field | Type |
-|---|---|
-| `schema_version` | integer, `2` |
-| `generated_at` | timestamp string, data-driven from pollutant manifest |
-| `source` | string, `r2_pollutant_manifest` |
-| `history_version` | string, `v2` |
-| `domain` | string |
-| `grain` | string/null |
-| `profile` | string/null |
-| `index_kind` | string, `timeseries_file_ranges` |
-| `bucket` | string |
-| `day_utc` | string date |
-| `connector_id` | integer |
-| `pollutant_code` | string |
-| `data_prefix` | string |
-| `pollutant_manifest_key` | string |
-| `connector_pollutant_manifest_key` | string |
-| `pollutant_manifest_hash` | string/null |
-| `source_row_count` | integer |
-| `timeseries_row_counts` | object/null |
-| `file_count` | integer |
-| `indexed_file_count` | integer |
-| `index_coverage` | string, `complete` or `partial` |
-| `min_timeseries_id` | integer/null |
-| `max_timeseries_id` | integer/null |
-| `min_observed_at_utc` | timestamp string/null, observations only |
-| `max_observed_at_utc` | timestamp string/null, observations only |
-| `min_timestamp_hour_utc` | timestamp string/null, AQI only |
-| `max_timestamp_hour_utc` | timestamp string/null, AQI only |
-| `files` | object[] |
-| `backed_up_at_utc` | timestamp string/null |
 | `min_timeseries_id` | integer/null |
 | `max_timeseries_id` | integer/null |
 | `min_timestamp_hour_utc` | timestamp string/null |

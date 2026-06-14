@@ -198,21 +198,10 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_STAGING_PREFIX` (default `history/v1/_ops/observations/staging`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
-- `UK_AQ_R2_HISTORY_WRITE_VERSION` (default `v1`; allowed `v1|v2`; v2 support is explicit and scheduled writes remain v1 unless this is set)
-- `UK_AQ_R2_HISTORY_V2_OBSERVATIONS_PREFIX` (default `history/v2/observations`)
-- `UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DATA_PREFIX` (default `history/v2/aqilevels/hourly/data`)
-- `UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DEBUG_PREFIX` (default `history/v2/aqilevels/hourly/debug`)
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX` (default `history/_index/observations_timeseries`)
 - `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
-
-R2 history v2 writer support:
-- v1 remains the default write path.
-- v2 observations are pollutant-partitioned and use `connector_id`, `station_id`, `timeseries_id`, `pollutant_code`, `observed_at_utc`, `value`.
-- v2 AQI hourly writes are split into compact `data` parquet and richer `debug` parquet.
-- v2 AQI debug parquet intentionally excludes old wide compatibility fields such as `pm25_rolling24h_mean_ugm3` and `updated_at`.
-- Validate the writer schema with `node --test tests/phase_b_history_r2.test.mjs`.
 
 Website observation API note:
 - `uk_aq_timeseries` now uses `INGESTDB_RETENTION_DAYS` as the single split control. The freshest retention window comes from ingestdb, and older observation history comes from R2 history. ObsAQIDB is not used for observation line chart data.
