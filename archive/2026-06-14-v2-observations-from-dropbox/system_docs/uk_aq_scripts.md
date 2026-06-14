@@ -110,22 +110,9 @@ system doc.
 - `scripts/backup_r2/uk_aq_validate_aqi_from_dropbox_observs.mjs`
   - Recomputes AQI history rows from local Dropbox observations parquet and
     compares them to local Dropbox aqilevels parquet by `(day_utc, connector_id)`.
-  - Supports `--history-version v1|v2`; v1 uses the configured v1 prefixes
-    exactly, while v2 reads `history/v2/observations` and
-    `history/v2/aqilevels/hourly/data` unless overridden by env.
   - `--dry-run` (default) reports mismatches only and does not write to R2.
   - `--write-r2` runs targeted AQI rebuild writes via
-    `scripts/uk_aq_backfill_local.sh` in `r2_history_obs_to_aqilevels` mode
-    with the selected `UK_AQ_R2_HISTORY_WRITE_VERSION`.
-- `scripts/backup_r2/uk_aq_build_v2_observations_from_dropbox_v1.mjs`
-  - Builds R2 `history/v2/observations` from the local Dropbox
-    `history/v1/observations` mirror plus the local core snapshot metadata.
-  - Writes only to R2 in `--write-r2` mode; it never writes generated parquet
-    back into the Dropbox mirror.
-  - Default mode is `--dry-run`, which reports planned v2 object keys, row
-    counts, missing metadata rows, and byte counts.
-  - Existing v2 day manifests are not overwritten unless `--replace` is set, so
-    connector-filtered smoke runs do not shrink an already-built day manifest.
+    `scripts/uk_aq_backfill_local.sh` in `r2_history_obs_to_aqilevels` mode.
 - `scripts/backup_r2/uk_aq_strip_day_timeseries_counts_from_r2.mjs`
   - Scans local Dropbox observations day manifests for top-level
     `timeseries_row_counts` and reports affected days.
