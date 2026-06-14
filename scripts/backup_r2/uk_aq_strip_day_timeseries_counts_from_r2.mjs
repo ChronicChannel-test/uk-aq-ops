@@ -41,7 +41,7 @@ function usage() {
     "  CFLARE_R2_REGION / R2_REGION",
     "  CFLARE_R2_ACCESS_KEY_ID / R2_ACCESS_KEY_ID",
     "  CFLARE_R2_SECRET_ACCESS_KEY / R2_SECRET_ACCESS_KEY",
-    "  R2 bucket mapping via CFLARE_R2_BUCKET / R2_BUCKET or R2_BUCKET_DEV/STAGE/PROD",
+    "  R2 bucket via CFLARE_R2_BUCKET / R2_BUCKET",
     "",
     "Optional env:",
     "  UK_AQ_DROPBOX_ROOT",
@@ -379,4 +379,3 @@ main().catch((error) => {
   process.stderr.write(`${JSON.stringify({ ok: false, error: message }, null, 2)}\n`);
   process.exit(1);
 });
-

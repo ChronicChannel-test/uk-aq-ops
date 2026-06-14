@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Build the R2 History backup inventory used by the Dropbox sync.
 //
-// The inventory lives at <source-root>/<inventory-rel-path> (default
-// history/_index/backup_inventory_v1.json) and records one entry per backup
-// unit: per-domain day manifests, the four *_latest.json index files, and the
-// per-(day, connector) manifests under the timeseries index trees, plus
-// committed observations connector manifests.
+// The inventory lives at <source-root>/<inventory-rel-path>. The default path
+// is version-selected: history/_index/backup_inventory_v1.json for v1 or
+// history/_index_v2/backup_inventory_v2.json for v2. It records one entry per
+// backup unit: per-domain day manifests, selected *_latest.json index files,
+// selected timeseries index tree manifests, plus committed observations
+// connector manifests.
 //
 // On subsequent runs, `rclone lsjson` is used to compare each remote file's
 // size + MD5 etag against the previous inventory; matching entries are reused
@@ -31,33 +32,28 @@ import {
 import {
   COMMITTED_CONNECTOR_UNIT_KEYS,
   DOMAIN_NAMES,
-  INDEX_FILE_KEYS,
-  INDEX_TREE_KEYS,
+  defaultInventoryRelPathForBackupVersion,
+  domainNamesForBackupVersion,
+  indexFileKeysForBackupVersion,
+  indexTreeKeysForBackupVersion,
   INVENTORY_KIND,
   INVENTORY_SCHEMA_VERSION,
   loadInventory,
+  parseBackupVersion,
+  resolveBackupVersion,
 } from "./lib/inventory.mjs";
 
-const DEFAULT_DOMAIN_PREFIXES = Object.freeze({
-  observations: normalizePrefix(
-    process.env.UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX || "history/v1/observations",
-  ),
-  aqilevels: normalizePrefix(
-    process.env.UK_AQ_R2_HISTORY_AQILEVELS_PREFIX || "history/v1/aqilevels/hourly",
-  ),
-  core: normalizePrefix(
-    process.env.UK_AQ_R2_HISTORY_CORE_PREFIX || "history/v1/core",
-  ),
-});
+const DEFAULT_BACKUP_VERSION = resolveBackupVersion(process.env);
 const DEFAULT_INDEX_PREFIX = normalizePrefix(
   process.env.UK_AQ_R2_HISTORY_INDEX_PREFIX || "history/_index",
 );
 const DEFAULT_INDEX_V2_PREFIX = normalizePrefix(
   process.env.UK_AQ_R2_HISTORY_INDEX_V2_PREFIX || "history/_index_v2",
 );
-const DEFAULT_INVENTORY_REL_PATH =
-  String(process.env.UK_AQ_R2_HISTORY_BACKUP_INVENTORY_REL_PATH || "").trim()
-  || `${DEFAULT_INDEX_PREFIX || "history/_index"}/backup_inventory_v1.json`;
+const ENV_INVENTORY_REL_PATH =
+  String(process.env.UK_AQ_R2_HISTORY_BACKUP_INVENTORY_REL_PATH || "").trim();
+const DEFAULT_INVENTORY_REL_PATH = ENV_INVENTORY_REL_PATH
+  || defaultInventoryRelPathForBackupVersion(DEFAULT_BACKUP_VERSION);
 const DEFAULT_RCLONE_BIN =
   String(process.env.UK_AQ_R2_HISTORY_BACKUP_RCLONE_BIN || "").trim() || "rclone";
 const DEFAULT_REPORT_OUT =
@@ -71,6 +67,37 @@ const INDEX_TREE_UNIT_V2_PATTERN =
 const COMMITTED_CONNECTOR_MANIFEST_PATTERN =
   /^day_utc=(\d{4}-\d{2}-\d{2})\/connector_id=(\d+)\/manifest\.json$/;
 
+function resolveDomainPrefixes(backupVersion, env = process.env) {
+  const version = parseBackupVersion(backupVersion);
+  if (version === "v2") {
+    return Object.freeze({
+      observations: normalizePrefix(
+        env.UK_AQ_R2_HISTORY_V2_OBSERVATIONS_PREFIX || "history/v2/observations",
+      ),
+      aqilevels: normalizePrefix(
+        env.UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DATA_PREFIX || "history/v2/aqilevels/hourly/data",
+      ),
+      aqilevels_debug: normalizePrefix(
+        env.UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DEBUG_PREFIX || "history/v2/aqilevels/hourly/debug",
+      ),
+      core: normalizePrefix(
+        env.UK_AQ_R2_HISTORY_V2_CORE_PREFIX || "history/v2/core",
+      ),
+    });
+  }
+  return Object.freeze({
+    observations: normalizePrefix(
+      env.UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX || "history/v1/observations",
+    ),
+    aqilevels: normalizePrefix(
+      env.UK_AQ_R2_HISTORY_AQILEVELS_PREFIX || "history/v1/aqilevels/hourly",
+    ),
+    core: normalizePrefix(
+      env.UK_AQ_R2_HISTORY_CORE_PREFIX || "history/v1/core",
+    ),
+  });
+}
+
 function usage() {
   console.log(
     [
@@ -82,14 +109,16 @@ function usage() {
       "  --source-root              Example: uk_aq_r2:uk-aq-history-cic-test",
       "",
       "Optional:",
+      `  --backup-version <v>       v1 | v2. Default: ${DEFAULT_BACKUP_VERSION}`,
       `  --inventory-rel-path <p>   Default: ${DEFAULT_INVENTORY_REL_PATH}`,
-      "  --domain <name>            observations | aqilevels | core (repeatable)",
+      "  --domain <name>            observations | aqilevels | aqilevels_debug | core (repeatable)",
       `  --index-prefix <prefix>    Default: ${DEFAULT_INDEX_PREFIX || "history/_index"}`,
       `  --index-v2-prefix <prefix> Default: ${DEFAULT_INDEX_V2_PREFIX || "history/_index_v2"}`,
       `  --rclone-bin <name>        Default: ${DEFAULT_RCLONE_BIN}`,
       "  --report-out <file>        Write JSON report to file",
       "  --dry-run                  Build/validate only; do not upload inventory",
       "  --full-rebuild             Ignore previous inventory; re-read every manifest",
+      "  --show-version             Print resolved backup config and exit",
       "  -h, --help",
     ].join("\n"),
   );
@@ -98,7 +127,8 @@ function usage() {
 function parseArgs(argv) {
   const args = {
     source_root: "",
-    inventory_rel_path: DEFAULT_INVENTORY_REL_PATH,
+    backup_version: DEFAULT_BACKUP_VERSION,
+    inventory_rel_path: ENV_INVENTORY_REL_PATH,
     domains: [],
     index_prefix: DEFAULT_INDEX_PREFIX,
     index_v2_prefix: DEFAULT_INDEX_V2_PREFIX,
@@ -106,10 +136,16 @@ function parseArgs(argv) {
     report_out: DEFAULT_REPORT_OUT,
     dry_run: false,
     full_rebuild: false,
+    show_version: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    if (arg === "--backup-version") {
+      args.backup_version = parseBackupVersion(argv[i + 1], DEFAULT_BACKUP_VERSION);
+      i += 1;
+      continue;
+    }
     if (arg === "--source-root") {
       args.source_root = String(argv[i + 1] || "").trim();
       i += 1;
@@ -160,11 +196,23 @@ function parseArgs(argv) {
       args.full_rebuild = true;
       continue;
     }
+    if (arg === "--show-version") {
+      args.show_version = true;
+      continue;
+    }
     if (arg === "-h" || arg === "--help") {
       usage();
       process.exit(0);
     }
     throw new Error(`Unknown arg: ${arg}`);
+  }
+
+  if (!args.inventory_rel_path) {
+    args.inventory_rel_path = defaultInventoryRelPathForBackupVersion(args.backup_version);
+  }
+
+  if (args.show_version) {
+    return args;
   }
 
   if (!args.source_root) {
@@ -174,7 +222,7 @@ function parseArgs(argv) {
     throw new Error("--inventory-rel-path cannot be empty");
   }
   if (args.domains.length === 0) {
-    args.domains = [...DOMAIN_NAMES];
+    args.domains = domainNamesForBackupVersion(args.backup_version);
   } else {
     args.domains = Array.from(new Set(args.domains));
   }
@@ -572,19 +620,38 @@ function buildDeterministicJson(inventory) {
   return `${JSON.stringify(sortObjectKeysDeep(inventory), null, 2)}\n`;
 }
 
-function computeSummary(inventory) {
+function computeSummary(inventory, { domainNames, indexTreeKeys }) {
   const domainDayCount = {};
-  for (const domain of DOMAIN_NAMES) {
-    domainDayCount[domain] = Object.keys(
-      inventory.domains?.[domain]?.days || {},
-    ).length;
+  const domainObjectCount = {};
+  const domainTotalBytes = {};
+  for (const domain of domainNames) {
+    const days = inventory.domains?.[domain]?.days || {};
+    domainDayCount[domain] = Object.keys(days).length;
+    domainObjectCount[domain] = 0;
+    domainTotalBytes[domain] = 0;
+    for (const entry of Object.values(days)) {
+      const fileCount = safeIntOrNull(entry?.file_count);
+      const totalBytes = safeIntOrNull(entry?.total_bytes);
+      if (fileCount !== null) domainObjectCount[domain] += fileCount;
+      if (totalBytes !== null) domainTotalBytes[domain] += totalBytes;
+    }
   }
   const indexFileCount = Object.keys(inventory.index_files || {}).length;
+  const indexFileBytes = Object.values(inventory.index_files || {}).reduce(
+    (sum, entry) => sum + (safeIntOrNull(entry?.size) ?? 0),
+    0,
+  );
   const indexTreeUnitCount = {};
-  for (const treeKey of INDEX_TREE_KEYS) {
+  const indexTreeUnitBytes = {};
+  for (const treeKey of indexTreeKeys) {
+    const units = inventory.index_tree_units?.[treeKey]?.units || {};
     indexTreeUnitCount[treeKey] = Object.keys(
-      inventory.index_tree_units?.[treeKey]?.units || {},
+      units,
     ).length;
+    indexTreeUnitBytes[treeKey] = Object.values(units).reduce(
+      (sum, entry) => sum + (safeIntOrNull(entry?.size) ?? 0),
+      0,
+    );
   }
   const committedConnectorUnitCount = {};
   for (const key of COMMITTED_CONNECTOR_UNIT_KEYS) {
@@ -594,8 +661,12 @@ function computeSummary(inventory) {
   }
   return {
     domain_day_count: domainDayCount,
+    domain_object_count: domainObjectCount,
+    domain_total_bytes: domainTotalBytes,
     index_file_count: indexFileCount,
+    index_file_bytes: indexFileBytes,
     index_tree_unit_count: indexTreeUnitCount,
+    index_tree_unit_bytes: indexTreeUnitBytes,
     committed_connector_unit_count: committedConnectorUnitCount,
   };
 }
@@ -605,6 +676,27 @@ function computeSummary(inventory) {
 async function main() {
   const t0 = Date.now();
   const args = parseArgs(process.argv.slice(2));
+  const domainPrefixes = resolveDomainPrefixes(args.backup_version);
+  const defaultDomains = domainNamesForBackupVersion(args.backup_version);
+  const indexFileKeys = indexFileKeysForBackupVersion(args.backup_version);
+  const indexTreeKeys = indexTreeKeysForBackupVersion(args.backup_version);
+
+  if (args.show_version) {
+    const selected = {
+      ok: true,
+      selected_backup_version: args.backup_version,
+      default_inventory_rel_path: defaultInventoryRelPathForBackupVersion(args.backup_version),
+      inventory_rel_path: args.inventory_rel_path,
+      default_domains: defaultDomains,
+      domain_prefixes: domainPrefixes,
+      index_prefix: args.index_prefix,
+      index_v2_prefix: args.index_v2_prefix,
+      index_file_keys: indexFileKeys,
+      index_tree_keys: indexTreeKeys,
+    };
+    process.stdout.write(`${JSON.stringify(selected, null, 2)}\n`);
+    return;
+  }
 
   const previousInventory = args.full_rebuild
     ? null
@@ -614,24 +706,20 @@ async function main() {
   const inventory = {
     version: INVENTORY_SCHEMA_VERSION,
     kind: INVENTORY_KIND,
+    backup_version: args.backup_version,
     generated_at: new Date().toISOString(),
     source: {
+      backup_version: args.backup_version,
       index_prefix: args.index_prefix,
       index_v2_prefix: args.index_v2_prefix,
-      domain_prefixes: {
-        observations: DEFAULT_DOMAIN_PREFIXES.observations,
-        aqilevels: DEFAULT_DOMAIN_PREFIXES.aqilevels,
-        core: DEFAULT_DOMAIN_PREFIXES.core,
-      },
+      domain_prefixes: Object.fromEntries(
+        args.domains.map((domain) => [domain, domainPrefixes[domain] || null]),
+      ),
     },
-    domains: {
-      observations: { days: {} },
-      aqilevels: { days: {} },
-      core: { days: {} },
-    },
+    domains: Object.fromEntries(args.domains.map((domain) => [domain, { days: {} }])),
     index_files: {},
     index_tree_units: Object.fromEntries(
-      INDEX_TREE_KEYS.map((treeKey) => [treeKey, { units: {} }]),
+      indexTreeKeys.map((treeKey) => [treeKey, { units: {} }]),
     ),
     committed_connector_units: {
       observations: { units: {} },
@@ -677,7 +765,7 @@ async function main() {
   // Phase: day folders per domain
   const tDays = Date.now();
   for (const domain of args.domains) {
-    const domainPrefix = DEFAULT_DOMAIN_PREFIXES[domain];
+    const domainPrefix = domainPrefixes[domain];
     if (!domainPrefix) {
       throw new Error(`No domain prefix configured for ${domain}`);
     }
@@ -698,7 +786,7 @@ async function main() {
 
   // Phase: latest index files (only included if present in R2)
   const tIndexFiles = Date.now();
-  for (const indexKey of INDEX_FILE_KEYS) {
+  for (const indexKey of indexFileKeys) {
     const previousEntry = previousInventory?.index_files?.[indexKey] || null;
     const scanConfig = indexFileScanConfig(indexKey, args);
     const entry = scanIndexFile({
@@ -719,7 +807,7 @@ async function main() {
 
   // Phase: timeseries index tree per-(day, connector) units
   const tTrees = Date.now();
-  for (const treeKey of INDEX_TREE_KEYS) {
+  for (const treeKey of indexTreeKeys) {
     const previousUnits =
       previousInventory?.index_tree_units?.[treeKey]?.units || {};
     const scanConfig = indexTreeScanConfig(treeKey, args);
@@ -747,7 +835,7 @@ async function main() {
     const units = scanCommittedConnectorManifests({
       rcloneBin: args.rclone_bin,
       sourceRoot: args.source_root,
-      domainPrefix: DEFAULT_DOMAIN_PREFIXES.observations,
+      domainPrefix: domainPrefixes.observations,
       previousUnits,
       excludeRelativePaths,
       stats,
@@ -756,7 +844,10 @@ async function main() {
   }
   stats.elapsed_ms.committed_connector_units = Date.now() - tConnectorManifests;
 
-  inventory.summary = computeSummary(inventory);
+  inventory.summary = computeSummary(inventory, {
+    domainNames: args.domains,
+    indexTreeKeys,
+  });
 
   const inventoryJson = buildDeterministicJson(inventory);
   const inventoryHash = sha256Hex(inventoryJson);
@@ -802,13 +893,33 @@ async function main() {
       + `exposing the etag for these objects.`,
     );
   }
+  const backupWarnings = [];
+  const missingDomainPrefixes = [];
+  if (args.backup_version === "v2") {
+    for (const domain of args.domains) {
+      const dayCount = inventory.summary.domain_day_count?.[domain] ?? 0;
+      if (dayCount > 0) continue;
+      const prefix = domainPrefixes[domain] || null;
+      missingDomainPrefixes.push({ domain, prefix });
+      backupWarnings.push(
+        `v2 backup domain ${domain} produced zero day manifests at ${prefix}; `
+        + `if this domain has not been written yet, the v2 Dropbox backup will omit it until it exists.`,
+      );
+    }
+  }
 
   const report = {
     ok: true,
+    selected_backup_version: args.backup_version,
     first_build: firstBuild,
     dry_run: args.dry_run,
     full_rebuild: args.full_rebuild,
     inventory_rel_path: args.inventory_rel_path,
+    domain_prefixes: Object.fromEntries(
+      args.domains.map((domain) => [domain, domainPrefixes[domain] || null]),
+    ),
+    index_prefix: args.index_prefix,
+    index_v2_prefix: args.index_v2_prefix,
     inventory_size: Buffer.byteLength(inventoryJson, "utf8"),
     inventory_hash: inventoryHash,
     generated_at: inventory.generated_at,
@@ -834,6 +945,8 @@ async function main() {
     reuse_by_size_modtime: stats.reuse_by_size_modtime,
     r2_md5_metadata_available: r2Md5Available,
     metadata_warnings: metadataWarnings,
+    backup_warnings: backupWarnings,
+    missing_domain_prefixes: missingDomainPrefixes,
     elapsed_ms: stats.elapsed_ms,
     summary: inventory.summary,
   };

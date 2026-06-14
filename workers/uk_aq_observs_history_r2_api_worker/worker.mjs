@@ -2,7 +2,9 @@ import { parquetMetadataAsync, parquetRead, parquetSchema } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 
 const DEFAULT_HISTORY_PREFIX = "history/v1/observations";
+const DEFAULT_HISTORY_V2_PREFIX = "history/v2/observations";
 const DEFAULT_HISTORY_INDEX_PREFIX = "history/_index";
+const DEFAULT_HISTORY_V2_INDEX_PREFIX = "history/_index_v2";
 const DEFAULT_TIMESERIES_INDEX_SUBPREFIX = "observations_timeseries";
 const DEFAULT_CACHE_SECONDS = 300;
 const DEFAULT_IMMUTABLE_CACHE_SECONDS = 86400;
@@ -69,6 +71,11 @@ function parseOptionalBoolean(raw, fallback) {
   return fallback;
 }
 
+function parseReadVersion(raw) {
+  const value = String(raw || "").trim().toLowerCase();
+  return value === "v2" ? "v2" : "v1";
+}
+
 function parseRequiredPositiveInt(raw) {
   if (raw === null || raw === undefined || String(raw).trim() === "") {
     return null;
@@ -79,6 +86,20 @@ function parseRequiredPositiveInt(raw) {
   }
   const value = Math.trunc(num);
   return value > 0 ? value : null;
+}
+
+function normalizePollutant(raw) {
+  const compact = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (compact === "pm25" || compact === "particulatematter25") {
+    return "pm25";
+  }
+  if (compact === "pm10" || compact === "particulatematter10") {
+    return "pm10";
+  }
+  if (compact === "no2" || compact === "nitrogendioxide") {
+    return "no2";
+  }
+  return null;
 }
 
 function toIsoOrNull(raw) {
@@ -227,7 +248,28 @@ function buildTimeseriesConnectorIndexKey(indexPrefix, dayUtc, connectorId) {
   return `${indexPrefix}/day_utc=${dayUtc}/connector_id=${connectorId}/manifest.json`;
 }
 
-async function fetchJsonObjectFromR2(env, key) {
+function buildTimeseriesPollutantIndexKey(indexPrefix, dayUtc, connectorId, pollutantKey) {
+  const normalizedPollutant = normalizePollutant(pollutantKey);
+  if (!normalizedPollutant) {
+    return null;
+  }
+  return `${indexPrefix}/day_utc=${dayUtc}/connector_id=${connectorId}/pollutant_code=${normalizedPollutant}/manifest.json`;
+}
+
+function createReadMetrics() {
+  return {
+    r2_object_reads: 0,
+    parquet_bytes_read: 0,
+    parquet_row_groups_scanned: 0,
+    parquet_chunks_scanned: 0,
+    parquet_matched_rows: 0,
+  };
+}
+
+async function fetchJsonObjectFromR2(env, key, metrics = null) {
+  if (metrics) {
+    metrics.r2_object_reads += 1;
+  }
   const object = await env.UK_AQ_HISTORY_BUCKET.get(key);
   if (!object) {
     return { exists: false, value: null };
@@ -247,12 +289,19 @@ async function fetchFilteredParquetRowsFromR2(
   key,
   timeseriesId,
   rowChunkSize,
+  metrics = null,
 ) {
+  if (metrics) {
+    metrics.r2_object_reads += 1;
+  }
   const object = await env.UK_AQ_HISTORY_BUCKET.get(key);
   if (!object) {
     return { exists: false, rows: [] };
   }
   const arrayBuffer = await object.arrayBuffer();
+  if (metrics) {
+    metrics.parquet_bytes_read += arrayBuffer.byteLength;
+  }
   const metadata = await parquetMetadataAsync(arrayBuffer, { compressors });
   const schemaColumns = parquetSchema(metadata).children.map((column) =>
     column.element.name
@@ -261,10 +310,19 @@ async function fetchFilteredParquetRowsFromR2(
   if (timeseriesStatsIndex < 0) {
     return { exists: true, rows: [] };
   }
+  const observedAtColumn = schemaColumns.includes("observed_at_utc")
+    ? "observed_at_utc"
+    : "observed_at";
+  if (!schemaColumns.includes(observedAtColumn) || !schemaColumns.includes("value")) {
+    return { exists: true, rows: [] };
+  }
 
   const outRows = [];
   let rowGroupStart = 0;
   for (const rowGroup of metadata.row_groups ?? []) {
+    if (metrics) {
+      metrics.parquet_row_groups_scanned += 1;
+    }
     const rowGroupRows = Number(rowGroup?.num_rows ?? 0);
     const rowGroupEnd = rowGroupStart + rowGroupRows;
     if (!Number.isFinite(rowGroupRows) || rowGroupRows <= 0) {
@@ -280,6 +338,9 @@ async function fetchFilteredParquetRowsFromR2(
       Number.isFinite(maxTimeseries) &&
       (timeseriesId < minTimeseries || timeseriesId > maxTimeseries)
     ) {
+      if (metrics) {
+        metrics.parquet_chunks_scanned += 1;
+      }
       rowGroupStart = rowGroupEnd;
       continue;
     }
@@ -312,7 +373,7 @@ async function fetchFilteredParquetRowsFromR2(
       const observedAtValues = await readParquetColumnValues(
         arrayBuffer,
         metadata,
-        "observed_at",
+        observedAtColumn,
         chunkStart,
         chunkEnd,
       );
@@ -331,6 +392,9 @@ async function fetchFilteredParquetRowsFromR2(
           observed_at: observedAtValues[idx],
           value: valueValues[idx],
         });
+      }
+      if (metrics) {
+        metrics.parquet_matched_rows += matchedIndexes.length;
       }
     }
     rowGroupStart = rowGroupEnd;
@@ -439,6 +503,17 @@ function parseObservationsRequest(url) {
     };
   }
 
+  const pollutantKey = url.searchParams.has("pollutant")
+    ? normalizePollutant(url.searchParams.get("pollutant"))
+    : null;
+  if (url.searchParams.has("pollutant") && !pollutantKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: "pollutant must be one of pm25, pm10, or no2 when provided.",
+    };
+  }
+
   const startIso = toIsoOrNull(url.searchParams.get("start_utc"));
   const endIso = toIsoOrNull(url.searchParams.get("end_utc"));
   if (!startIso || !endIso) {
@@ -484,6 +559,7 @@ function parseObservationsRequest(url) {
     ok: true,
     timeseriesId,
     connectorId,
+    pollutantKey,
     startIso,
     endIso,
     sinceIso,
@@ -494,17 +570,22 @@ function parseObservationsRequest(url) {
 function buildCanonicalCacheKey(requestUrl, {
   timeseriesId,
   connectorId,
+  pollutantKey,
   startIso,
   endIso,
   sinceIso,
   limit,
-}) {
+}, readVersion = "v1") {
   const cacheUrl = new URL(requestUrl);
   cacheUrl.pathname = "/v1/observations";
   cacheUrl.search = "";
   cacheUrl.hash = "";
   cacheUrl.searchParams.set("timeseries_id", String(timeseriesId));
   cacheUrl.searchParams.set("connector_id", String(connectorId));
+  cacheUrl.searchParams.set("__ukaq_observs_history_read_v", parseReadVersion(readVersion));
+  if (pollutantKey) {
+    cacheUrl.searchParams.set("pollutant", pollutantKey);
+  }
   cacheUrl.searchParams.set("start_utc", startIso);
   cacheUrl.searchParams.set("end_utc", endIso);
   if (sinceIso) {
@@ -550,8 +631,12 @@ function extractParquetKeysFromTimeseriesIndex(
       continue;
     }
 
-    const fileMinObservedMs = parseMsOrNaN(entry?.min_observed_at);
-    const fileMaxObservedMs = parseMsOrNaN(entry?.max_observed_at);
+    const fileMinObservedMs = parseMsOrNaN(
+      entry?.min_observed_at_utc ?? entry?.min_observed_at,
+    );
+    const fileMaxObservedMs = parseMsOrNaN(
+      entry?.max_observed_at_utc ?? entry?.max_observed_at,
+    );
     const hasTimeRange = Number.isFinite(fileMinObservedMs) &&
       Number.isFinite(fileMaxObservedMs) &&
       fileMaxObservedMs >= fileMinObservedMs;
@@ -641,9 +726,13 @@ function summarizeCoverageCompleteness(historyRead) {
 
 async function readHistoryRows({
   env,
+  readVersion = "v1",
   historyPrefix,
+  historyIndexPrefix,
+  timeseriesIndexPrefix,
   timeseriesId,
   connectorId,
+  pollutantKey,
   startIso,
   endIso,
   sinceIso,
@@ -661,20 +750,22 @@ async function readHistoryRows({
     500,
     50000,
   );
-  const historyIndexPrefix = normalizePrefix(
-    env.UK_AQ_R2_HISTORY_INDEX_PREFIX || DEFAULT_HISTORY_INDEX_PREFIX,
-  ) || DEFAULT_HISTORY_INDEX_PREFIX;
-  const timeseriesIndexPrefix = normalizePrefix(
-    env.UK_AQ_OBSERVS_HISTORY_R2_TIMESERIES_INDEX_PREFIX ||
-      env.UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX ||
-      `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`,
-  ) || `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`;
+  const normalizedReadVersion = parseReadVersion(readVersion);
+  const normalizedHistoryIndexPrefix = normalizePrefix(historyIndexPrefix || (
+    normalizedReadVersion === "v2"
+      ? DEFAULT_HISTORY_V2_INDEX_PREFIX
+      : DEFAULT_HISTORY_INDEX_PREFIX
+  ));
+  const normalizedTimeseriesIndexPrefix = normalizePrefix(timeseriesIndexPrefix || (
+    `${normalizedHistoryIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`
+  ));
   const timeseriesIndexEnabled = parseOptionalBoolean(
     env.UK_AQ_OBSERVS_HISTORY_R2_TIMESERIES_INDEX_ENABLED,
     true,
   );
 
   const days = listUtcDays(startIso, endIso);
+  const metrics = createReadMetrics();
   const rowsByObservedAt = new Map();
   const missingDayManifestKeys = [];
   const missingConnectorManifestKeys = [];
@@ -689,38 +780,76 @@ async function readHistoryRows({
   let timeseriesIndexSkippedByTimeRangeFiles = 0;
   let timeseriesIndexIndexedFileCount = 0;
   let timeseriesIndexUnknownRangeFileCount = 0;
+  const normalizedPollutantKey = normalizePollutant(pollutantKey);
+
+  if (normalizedReadVersion === "v2" && !timeseriesIndexEnabled) {
+    timeseriesIndexWarnings.push(
+      "Skipped v2 observations history scan: v2 requires the observations timeseries index.",
+    );
+  }
+
+  if (normalizedReadVersion === "v2" && !normalizedPollutantKey) {
+    timeseriesIndexWarnings.push(
+      "Skipped v2 observations history scan: pollutant is required for pollutant-partitioned v2 reads.",
+    );
+    return {
+      rows: [],
+      limited_by_limit: false,
+      total_rows_before_limit: 0,
+      days_scanned: 0,
+      scanned_parquet_files: 0,
+      missing_day_manifest_keys: [],
+      missing_connector_manifest_keys: [],
+      missing_parquet_keys: [],
+      metrics,
+      timeseries_index: {
+        enabled: timeseriesIndexEnabled,
+        prefix: normalizedTimeseriesIndexPrefix,
+        read_version: normalizedReadVersion,
+        index_version: normalizedReadVersion,
+        pollutant_partition: null,
+        scanned_connector_index_keys: 0,
+        hit_count: 0,
+        miss_count: 0,
+        skipped_days_by_file_range: 0,
+        skipped_files_by_time_range: 0,
+        indexed_file_count_seen: 0,
+        unknown_range_file_count_seen: 0,
+        missing_connector_index_keys: [],
+        warnings: timeseriesIndexWarnings,
+      },
+    };
+  }
 
   for (const dayUtc of days) {
-    const dayManifestKey = buildDayManifestKey(historyPrefix, dayUtc);
-    const dayManifestObject = await fetchJsonObjectFromR2(env, dayManifestKey);
-    if (!dayManifestObject.exists) {
-      missingDayManifestKeys.push(dayManifestKey);
-      continue;
-    }
-
-    const connectorManifestFallbackKey = buildConnectorManifestKey(
-      historyPrefix,
-      dayUtc,
-      connectorId,
-    );
-    const connectorManifestKey = findConnectorManifestKey(
-      dayManifestObject.value,
-      connectorId,
-      connectorManifestFallbackKey,
-    );
     let parquetKeys = null;
+    let connectorManifestKey = null;
 
     if (timeseriesIndexEnabled) {
-      const connectorIndexKey = buildTimeseriesConnectorIndexKey(
-        timeseriesIndexPrefix,
-        dayUtc,
-        connectorId,
-      );
+      const connectorIndexKey = normalizedReadVersion === "v2"
+        ? buildTimeseriesPollutantIndexKey(
+          normalizedTimeseriesIndexPrefix,
+          dayUtc,
+          connectorId,
+          normalizedPollutantKey,
+        )
+        : buildTimeseriesConnectorIndexKey(
+          normalizedTimeseriesIndexPrefix,
+          dayUtc,
+          connectorId,
+        );
+      if (!connectorIndexKey) {
+        timeseriesIndexWarnings.push(
+          `Skipped observations history index for day=${dayUtc}: pollutant is required for v2.`,
+        );
+        continue;
+      }
       timeseriesIndexScannedKeys.push(connectorIndexKey);
       try {
         const connectorIndexObject = await fetchJsonObjectFromR2(
           env,
           connectorIndexKey,
+          metrics,
         );
         if (connectorIndexObject.exists) {
           timeseriesIndexHitCount += 1;
@@ -749,6 +878,11 @@ async function readHistoryRows({
         } else {
           timeseriesIndexMissCount += 1;
           timeseriesIndexMissingKeys.push(connectorIndexKey);
+          if (normalizedReadVersion === "v2") {
+            timeseriesIndexWarnings.push(
+              `Missing required v2 observations timeseries index: ${connectorIndexKey}`,
+            );
+          }
         }
       } catch (error) {
         timeseriesIndexMissCount += 1;
@@ -759,10 +893,35 @@ async function readHistoryRows({
       }
     }
 
+    if (normalizedReadVersion === "v2") {
+      if (parquetKeys === null) {
+        continue;
+      }
+    } else {
+      const dayManifestKey = buildDayManifestKey(historyPrefix, dayUtc);
+      const dayManifestObject = await fetchJsonObjectFromR2(env, dayManifestKey, metrics);
+      if (!dayManifestObject.exists) {
+        missingDayManifestKeys.push(dayManifestKey);
+        continue;
+      }
+
+      const connectorManifestFallbackKey = buildConnectorManifestKey(
+        historyPrefix,
+        dayUtc,
+        connectorId,
+      );
+      connectorManifestKey = findConnectorManifestKey(
+        dayManifestObject.value,
+        connectorId,
+        connectorManifestFallbackKey,
+      );
+    }
+
     if (parquetKeys === null) {
       const connectorManifestObject = await fetchJsonObjectFromR2(
         env,
         connectorManifestKey,
+        metrics,
       );
       if (!connectorManifestObject.exists) {
         missingConnectorManifestKeys.push(connectorManifestKey);
@@ -784,6 +943,7 @@ async function readHistoryRows({
         parquetKey,
         timeseriesId,
         parquetRowChunkSize,
+        metrics,
       );
       if (!parquet.exists) {
         missingParquetKeys.push(parquetKey);
@@ -808,9 +968,13 @@ async function readHistoryRows({
     missing_day_manifest_keys: missingDayManifestKeys,
     missing_connector_manifest_keys: missingConnectorManifestKeys,
     missing_parquet_keys: missingParquetKeys,
+    metrics,
     timeseries_index: {
       enabled: timeseriesIndexEnabled,
-      prefix: timeseriesIndexPrefix,
+      prefix: normalizedTimeseriesIndexPrefix,
+      read_version: normalizedReadVersion,
+      index_version: normalizedReadVersion,
+      pollutant_partition: normalizedReadVersion === "v2" ? normalizedPollutantKey : null,
       scanned_connector_index_keys: timeseriesIndexScannedKeys.length,
       hit_count: timeseriesIndexHitCount,
       miss_count: timeseriesIndexMissCount,
@@ -828,22 +992,57 @@ async function handleRequest(requestParams, env) {
   const {
     timeseriesId,
     connectorId,
+    pollutantKey,
     startIso,
     endIso,
     sinceIso,
     limit,
   } = requestParams;
-  const historyPrefix = normalizePrefix(
-    env.UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX || DEFAULT_HISTORY_PREFIX,
-  ) || DEFAULT_HISTORY_PREFIX;
+  const readVersion = parseReadVersion(env.UK_AQ_R2_HISTORY_READ_VERSION);
+  const historyPrefix = readVersion === "v2"
+    ? (
+      normalizePrefix(env.UK_AQ_R2_HISTORY_V2_OBSERVATIONS_PREFIX || DEFAULT_HISTORY_V2_PREFIX)
+      || DEFAULT_HISTORY_V2_PREFIX
+    )
+    : (
+      normalizePrefix(env.UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX || DEFAULT_HISTORY_PREFIX)
+      || DEFAULT_HISTORY_PREFIX
+    );
+  const historyIndexPrefix = readVersion === "v2"
+    ? (
+      normalizePrefix(env.UK_AQ_R2_HISTORY_INDEX_V2_PREFIX || DEFAULT_HISTORY_V2_INDEX_PREFIX)
+      || DEFAULT_HISTORY_V2_INDEX_PREFIX
+    )
+    : (
+      normalizePrefix(env.UK_AQ_R2_HISTORY_INDEX_PREFIX || DEFAULT_HISTORY_INDEX_PREFIX)
+      || DEFAULT_HISTORY_INDEX_PREFIX
+    );
+  const timeseriesIndexPrefix = readVersion === "v2"
+    ? (
+      normalizePrefix(
+        env.UK_AQ_R2_HISTORY_V2_OBSERVATIONS_TIMESERIES_INDEX_PREFIX
+          || `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`,
+      ) || `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`
+    )
+    : (
+      normalizePrefix(
+        env.UK_AQ_OBSERVS_HISTORY_R2_TIMESERIES_INDEX_PREFIX
+          || env.UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX
+          || `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`,
+      ) || `${historyIndexPrefix}/${DEFAULT_TIMESERIES_INDEX_SUBPREFIX}`
+    );
   const cachePolicy = resolveCachePolicy(env, endIso);
   const { cacheSeconds, cacheScope } = cachePolicy;
 
   const historyRead = await readHistoryRows({
     env,
+    readVersion,
     historyPrefix,
+    historyIndexPrefix,
+    timeseriesIndexPrefix,
     timeseriesId,
     connectorId,
+    pollutantKey,
     startIso,
     endIso,
     sinceIso,
@@ -854,7 +1053,12 @@ async function handleRequest(requestParams, env) {
   return jsonResponse({
     ok: true,
     generated_at_utc: new Date().toISOString(),
+    read_version: readVersion,
+    index_version: readVersion,
+    pollutant: pollutantKey,
     history_prefix: historyPrefix,
+    history_index_prefix: historyIndexPrefix,
+    timeseries_index_prefix: timeseriesIndexPrefix,
     timeseries_id: timeseriesId,
     connector_id: connectorId,
     start_utc: startIso,
@@ -868,8 +1072,19 @@ async function handleRequest(requestParams, env) {
     partial_reasons: completeness.partial_reasons,
     rows: historyRead.rows,
     coverage: {
+      read_version: readVersion,
+      index_version: historyRead.timeseries_index?.index_version || readVersion,
+      pollutant_partition: historyRead.timeseries_index?.pollutant_partition || null,
+      history_prefix: historyPrefix,
+      history_index_prefix: historyIndexPrefix,
+      timeseries_index_prefix: timeseriesIndexPrefix,
       days_scanned: historyRead.days_scanned,
       scanned_parquet_files: historyRead.scanned_parquet_files,
+      r2_object_reads: historyRead.metrics?.r2_object_reads ?? null,
+      parquet_bytes_read: historyRead.metrics?.parquet_bytes_read ?? null,
+      parquet_row_groups_scanned: historyRead.metrics?.parquet_row_groups_scanned ?? null,
+      parquet_chunks_scanned: historyRead.metrics?.parquet_chunks_scanned ?? null,
+      parquet_matched_rows: historyRead.metrics?.parquet_matched_rows ?? null,
       limited_by_limit: historyRead.limited_by_limit,
       total_rows_before_limit: historyRead.total_rows_before_limit,
       response_complete: completeness.response_complete,
@@ -921,7 +1136,8 @@ export default {
       });
     }
 
-    const cacheKey = buildCanonicalCacheKey(request.url, requestParams);
+    const readVersion = parseReadVersion(env.UK_AQ_R2_HISTORY_READ_VERSION);
+    const cacheKey = buildCanonicalCacheKey(request.url, requestParams, readVersion);
     const cached = await caches.default.match(cacheKey);
     if (cached) {
       return withCacheMarker(cached, "HIT");

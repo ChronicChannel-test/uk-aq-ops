@@ -205,7 +205,6 @@ Key optional controls:
 - `UK_AQ_R2_HISTORY_RUNS_PREFIX` (default `history/v1/_ops/observations/runs`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_TIMESERIES_INDEX_PREFIX` (default `history/_index/observations_timeseries`)
-- `UK_AQ_DEPLOY_ENV` (`dev|stage|prod`; default `dev`)
 
 R2 history v2 writer support:
 - v1 remains the default write path.
@@ -222,7 +221,7 @@ Phase B required env/secrets:
 - `SUPABASE_DB_URL` (direct Postgres URL for streaming cursor reads)
 - `CFLARE_R2_ENDPOINT`
 - `CFLARE_R2_REGION` (default `auto`)
-- bucket mapping: `R2_BUCKET_PROD` / `R2_BUCKET_STAGE` / `R2_BUCKET_DEV` (or fallback `CFLARE_R2_BUCKET`)
+- `CFLARE_R2_BUCKET` (or fallback `R2_BUCKET`; Test and LIVE use separate Cloudflare/R2 accounts, so no deploy-env bucket selector is needed)
 - `CFLARE_R2_ACCESS_KEY_ID`
 - `CFLARE_R2_SECRET_ACCESS_KEY`
 

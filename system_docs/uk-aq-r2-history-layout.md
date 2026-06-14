@@ -22,9 +22,10 @@ Known bucket env/config names from the R2 layout docs:
 
 - `R2_BUCKET`
 - `CFLARE_R2_BUCKET`
-- `R2_BUCKET_PROD`
-- `R2_BUCKET_STAGE`
-- `R2_BUCKET_DEV`
+
+Test and LIVE use separate Cloudflare/R2 accounts, so active R2 history code
+uses the configured bucket directly. Do not use a deploy-env bucket selector or
+per-environment bucket mapping.
 
 ## Stable top-level prefixes
 
@@ -770,6 +771,13 @@ The index is built from v2 data manifests only:
 
 No debug AQI v2 indexes are built under `_index_v2`.
 
+The observations history API Worker reads this v2 layout only when
+`UK_AQ_R2_HISTORY_READ_VERSION=v2`. In that mode, requests must include a
+`pollutant` query parameter (`pm25`, `pm10`, or `no2`) so the Worker can read
+the exact per-pollutant index and parquet partition. With the default
+`UK_AQ_R2_HISTORY_READ_VERSION=v1`, the Worker keeps using the v1 observations
+prefix and v1 observations timeseries index variables.
+
 Latest descriptor fields:
 
 | Field | Type |
@@ -846,6 +854,18 @@ history/v1/core/day_utc=YYYY-MM-DD/manifest.json
 history/v1/core/day_utc=YYYY-MM-DD/checksums.sha256
 history/v1/core/day_utc=YYYY-MM-DD/table=<table>/rows.ndjson.gz
 ```
+
+For R2 history Dropbox backup v2 mode, core snapshots are expected under the
+matching v2 backup prefix once v2 writes are active:
+
+```text
+history/v2/core/day_utc=YYYY-MM-DD/manifest.json
+history/v2/core/day_utc=YYYY-MM-DD/checksums.sha256
+history/v2/core/day_utc=YYYY-MM-DD/table=<table>/rows.ndjson.gz
+```
+
+The v2 backup inventory reports missing `history/v2/core` coverage as a warning
+and does not silently fall back to `history/v1/core`.
 
 Core manifest fields:
 

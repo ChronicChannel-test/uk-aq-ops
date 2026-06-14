@@ -13,6 +13,17 @@ For the canonical R2 object tree and manifest/index payload shapes, see `system_
 ## Architecture
 
 The backup is a **two-step pipeline** built around an R2-side inventory file.
+It runs in exactly one layout mode per run: `v1` or `v2`.
+
+Version selection:
+
+1. `UK_AQ_R2_HISTORY_BACKUP_VERSION` if set.
+2. Otherwise `UK_AQ_R2_HISTORY_WRITE_VERSION` if set.
+3. Otherwise `v1`.
+
+This lets the daily backup normally follow the active writer layout while still
+allowing the backup to be pinned to v1 during mixed transition or backfill
+windows.
 
 1. **Builder** (`scripts/backup_r2/build_backup_inventory.mjs`) walks R2, decides which manifests have changed since the previous inventory (via `rclone lsjson` etag/size compare), reads only those, and writes a single deterministic JSON inventory back to R2.
 2. **Sync** (`scripts/backup_r2/sync_history_to_dropbox.mjs`) reads that one inventory file, compares each entry's hash to the Dropbox-side checkpoint, and copies only the entries whose hashes differ.
@@ -36,13 +47,16 @@ The sync never scans R2 manifests directly. If the inventory is missing or inval
                  │ reads inventory
                  └── reads/writes checkpoint at
                      _ops/checkpoints/r2_history_backup_state_v1.json
+                     or r2_history_backup_state_v2.json
 ```
 
 ## Inventory file
 
 Location:
 
-- R2: `history/_index/backup_inventory_v1.json` (one per bucket — CIC-Test and LIVE are separate)
+- v1 R2: `history/_index/backup_inventory_v1.json`
+- v2 R2: `history/_index_v2/backup_inventory_v2.json`
+- One per bucket — CIC-Test and LIVE are separate.
 
 Shape (abbreviated):
 
@@ -50,6 +64,7 @@ Shape (abbreviated):
 {
   "version": 1,
   "kind": "uk_aq_r2_history_backup_inventory",
+  "backup_version": "v1",
   "generated_at": "2026-05-15T12:00:00.000Z",
   "source": {
     "index_prefix": "history/_index",
@@ -74,6 +89,7 @@ Shape (abbreviated):
       }
     },
     "aqilevels": { "days": {...} },
+    "aqilevels_debug": { "days": {...} },
     "core": { "days": {...} }
   },
   "index_files": {
@@ -98,7 +114,15 @@ Shape (abbreviated):
     },
     "aqilevels_hourly_data_timeseries_v2": { "units": {...} }
   },
-  "summary": { "domain_day_count": {...}, "index_file_count": 4, "index_tree_unit_count": {...} }
+  "summary": {
+    "domain_day_count": {...},
+    "domain_object_count": {...},
+    "domain_total_bytes": {...},
+    "index_file_count": 4,
+    "index_file_bytes": 12345,
+    "index_tree_unit_count": {...},
+    "index_tree_unit_bytes": {...}
+  }
 }
 ```
 
@@ -128,7 +152,7 @@ The R2 history index rebuilder ([workers/shared/uk_aq_r2_history_index.mjs](../w
 - when v2 indexes are explicitly built, per-`(day, connector, pollutant)` tree-unit manifests under `history/_index_v2/{observations_timeseries,aqilevels_hourly_data_timeseries}/day_utc=…/connector_id=…/pollutant_code=…/manifest.json`
 - when present, the two v2 latest files: `history/_index_v2/observations_timeseries_latest.json` and `history/_index_v2/aqilevels_hourly_data_timeseries_latest.json`
 
-This is a different "build" from the **inventory build** that runs inside the Dropbox backup workflow itself — the index rebuild produces R2 objects; the inventory build observes them. They share no code path. If you're confused which one is misbehaving, look at the output path: `_index/*` = index rebuild (in prune); `_index/backup_inventory_v1.json` = inventory build (in Dropbox backup workflow).
+This is a different "build" from the **inventory build** that runs inside the Dropbox backup workflow itself — the index rebuild produces R2 objects; the inventory build observes them. They share no code path. If you're confused which one is misbehaving, look at the output path: `_index/*` or `_index_v2/*` = index rebuild; `backup_inventory_v1.json` or `backup_inventory_v2.json` = inventory build.
 
 Three properties of the rebuilder make our daily backup fast:
 
@@ -159,13 +183,20 @@ Dropbox root (example):
 
 - `CIC-Test/R2_history_backup`
 
-Mirrored domain paths:
+Mirrored v1 domain paths:
 
 - `history/v1/observations/day_utc=YYYY-MM-DD/...`
 - `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/...`
 - `history/v1/core/day_utc=YYYY-MM-DD/...`
 
-Mirrored derived index files:
+Mirrored v2 domain paths:
+
+- `history/v2/observations/day_utc=YYYY-MM-DD/...`
+- `history/v2/aqilevels/hourly/data/day_utc=YYYY-MM-DD/...`
+- `history/v2/aqilevels/hourly/debug/day_utc=YYYY-MM-DD/...`
+- `history/v2/core/day_utc=YYYY-MM-DD/...`
+
+Mirrored v1 derived index files:
 
 - `history/_index/observations_latest.json`
 - `history/_index/aqilevels_latest.json`
@@ -173,18 +204,23 @@ Mirrored derived index files:
 - `history/_index/aqilevels_timeseries_latest.json`
 - `history/_index/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
 - `history/_index/aqilevels_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json`
+
+Mirrored v2 derived index files:
+
 - `history/_index_v2/observations_timeseries_latest.json`
 - `history/_index_v2/aqilevels_hourly_data_timeseries_latest.json`
 - `history/_index_v2/observations_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json`
 - `history/_index_v2/aqilevels_hourly_data_timeseries/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json`
 
-Checkpoint path (default):
+Checkpoint paths:
 
 - `_ops/checkpoints/r2_history_backup_state_v1.json`
+- `_ops/checkpoints/r2_history_backup_state_v2.json`
 
-Final checkpoint object location example:
+Final checkpoint object location examples:
 
 - `CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v1.json`
+- `CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v2.json`
 
 The inventory itself lives in R2 only and is **not** mirrored into Dropbox (control metadata, not a backup unit).
 
@@ -226,30 +262,36 @@ The checkpoint is rewritten after each successful unit copy so a job interrupted
 
 ### Builder — `scripts/backup_r2/build_backup_inventory.mjs`
 
-Builds or updates `history/_index/backup_inventory_v1.json`.
+Builds or updates the selected inventory:
+
+- v1: `history/_index/backup_inventory_v1.json`
+- v2: `history/_index_v2/backup_inventory_v2.json`
 
 CLI:
 
 ```text
 --source-root <rclone-source-root>   required (e.g. uk_aq_r2:uk-aq-history-cic-test)
---inventory-rel-path <path>          default history/_index/backup_inventory_v1.json
---domain <name>                      observations | aqilevels | core (repeatable; default all)
+--backup-version <v1|v2>             optional override
+--inventory-rel-path <path>          optional override; default is version-specific
+--domain <name>                      observations | aqilevels | aqilevels_debug | core
 --index-prefix <prefix>              default history/_index
 --index-v2-prefix <prefix>           default history/_index_v2
 --rclone-bin <name>                  default rclone
 --report-out <file>                  write JSON report to file
 --dry-run                            build/validate only; do not upload
 --full-rebuild                       ignore previous inventory; re-read every manifest
+--show-version                       print resolved backup config and exit
 ```
 
 Behaviour:
 
 1. Loads the previous inventory from R2 (skipped on `--full-rebuild` or first run; any unreadable previous inventory is silently treated as "no previous").
 2. For each selected domain, `rclone lsjson --recursive` enumerates every `day_utc=*/manifest.json`. For each: if etag+size matches the previous inventory entry, reuse verbatim; otherwise `rclone cat` it, SHA-256 the bytes, extract `file_count`/`total_bytes`/`source_row_count`.
-3. Same etag-skip pattern for v1 `*_latest.json` index files and v2 `_index_v2/*_latest.json` files when present.
-4. Same etag-skip pattern for v1 per-`(day, connector)` manifests under `history/_index/observations_timeseries/` and `history/_index/aqilevels_timeseries/`, plus v2 per-`(day, connector, pollutant)` manifests under `_index_v2` when present.
+3. In v1 mode, scans v1 `*_latest.json` index files and v1 per-`(day, connector)` index manifests only.
+4. In v2 mode, scans `_index_v2/*_latest.json` files and v2 per-`(day, connector, pollutant)` index manifests only.
 5. Writes deterministic JSON, uploads via `rclone copyto` from a temp file unless `--dry-run`.
 6. Defensive guard: the inventory's own path is excluded from all scans so it can never include itself.
+7. In v2 mode, reports any selected v2 domain with zero day manifests under `backup_warnings` and `missing_domain_prefixes`; it does not silently fall back to v1 core.
 
 ### Sync — `scripts/backup_r2/sync_history_to_dropbox.mjs`
 
@@ -260,13 +302,15 @@ CLI:
 ```text
 --source-root <root>           required
 --dest-root <root>             required
---inventory-rel-path <path>    default history/_index/backup_inventory_v1.json
---state-rel-path <path>        default _ops/checkpoints/r2_history_backup_state_v1.json
---domain <name>                observations | aqilevels | core (repeatable; default all)
+--backup-version <v1|v2>       optional override
+--inventory-rel-path <path>    optional override; default is version-specific
+--state-rel-path <path>        optional override; default is version-specific
+--domain <name>                observations | aqilevels | aqilevels_debug | core
 --max-days-per-run <N>         safety throttle on day copies; 0 = unlimited
 --rclone-bin <name>            default rclone
 --report-out <file>            write JSON report to file
 --dry-run                      plan only; no copies, no checkpoint writes
+--show-version                 print resolved backup config and exit
 ```
 
 Behaviour:
@@ -274,15 +318,15 @@ Behaviour:
 1. Loads the inventory via strict reader. Missing / empty / invalid JSON / wrong kind / wrong version → exit non-zero with an actionable error ending in "re-run scripts/backup_r2/build_backup_inventory.mjs --source-root <root> to regenerate it."
 2. Loads the Dropbox checkpoint (creates an empty one if absent; accepts old shapes without the new index sections).
 3. **Plan days** per domain: for each day in inventory, compare `manifest_hash` against checkpoint's stored hash. Mismatch → queue. Apply `--max-days-per-run` per domain.
-4. **Plan index files**: same hash compare for each of the four `*_latest.json` files.
-5. **Plan index tree units**: same hash compare for each per-`(day, connector)` manifest.
+4. **Plan index files**: same hash compare for the selected version's index latest files.
+5. **Plan index tree units**: same hash compare for the selected version's index tree manifests.
 6. **Copy** queued units (`rclone copy` for day folders, `rclone copyto` for single files). Dropbox `too_many_write_operations` responses are retried with exponential backoff before the unit is treated as failed. On each successful copy, update the checkpoint section and rewrite the checkpoint.
 7. **No deletion propagation**: units in the checkpoint but absent from the inventory are ignored; nothing is removed from Dropbox.
 
 ### Shared library — `scripts/backup_r2/lib/`
 
 - `lib/rclone.mjs` — rclone wrappers (`runRclone`, `runRcloneWithRetry`, `rcloneCatMaybe`, `rcloneCat`, `rcloneLsjsonRecursive`, `rcloneLsjsonFile`, `uploadFromTempFile`), `sha256Hex`, `joinTargetPath`, `normalizePrefix`. Single source of truth for shell invocation shape and not-found detection.
-- `lib/inventory.mjs` — schema constants (`INVENTORY_SCHEMA_VERSION`, `INVENTORY_KIND`, `DOMAIN_NAMES`, `INDEX_FILE_KEYS`, `INDEX_TREE_KEYS`, `DEFAULT_INVENTORY_REL_PATH`) and `loadInventory(rcloneBin, sourceRoot, relPath, { strict })`. `strict: true` is used by sync (fails loudly); `strict: false` is used by the builder when reading the previous inventory.
+- `lib/inventory.mjs` — schema constants, version selectors, version-specific default inventory/checkpoint paths, and `loadInventory(rcloneBin, sourceRoot, relPath, { strict })`. `strict: true` is used by sync (fails loudly); `strict: false` is used by the builder when reading the previous inventory.
 
 ## Workflows
 
@@ -340,12 +384,18 @@ Variables:
 - `UK_AQ_R2_HISTORY_OBSERVATIONS_PREFIX` (default `history/v1/observations`)
 - `UK_AQ_R2_HISTORY_AQILEVELS_PREFIX` (default `history/v1/aqilevels/hourly`)
 - `UK_AQ_R2_HISTORY_CORE_PREFIX` (default `history/v1/core`)
+- `UK_AQ_R2_HISTORY_WRITE_VERSION` (default `v1`)
+- `UK_AQ_R2_HISTORY_BACKUP_VERSION` (optional override; blank follows write version)
+- `UK_AQ_R2_HISTORY_V2_OBSERVATIONS_PREFIX` (default `history/v2/observations`)
+- `UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DATA_PREFIX` (default `history/v2/aqilevels/hourly/data`)
+- `UK_AQ_R2_HISTORY_V2_AQILEVELS_HOURLY_DEBUG_PREFIX` (default `history/v2/aqilevels/hourly/debug`)
+- `UK_AQ_R2_HISTORY_V2_CORE_PREFIX` (default `history/v2/core`)
 - `UK_AQ_R2_HISTORY_INDEX_PREFIX` (default `history/_index`)
 - `UK_AQ_R2_HISTORY_INDEX_V2_PREFIX` (default `history/_index_v2`)
 - `UK_AQ_DROPBOX_ROOT` (default `CIC-Test`)
 - `UK_AQ_R2_HISTORY_DROPBOX_DIR` (default `R2_history_backup`)
-- `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (default `_ops/checkpoints/r2_history_backup_state_v1.json`)
-- `UK_AQ_R2_HISTORY_BACKUP_INVENTORY_REL_PATH` (optional override; default `history/_index/backup_inventory_v1.json`)
+- `UK_AQ_R2_HISTORY_BACKUP_STATE_REL_PATH` (optional override; default is version-specific)
+- `UK_AQ_R2_HISTORY_BACKUP_INVENTORY_REL_PATH` (optional override; default is version-specific)
 - `UK_AQ_R2_HISTORY_BACKUP_MAX_DAYS_PER_RUN` (default `0` = unlimited)
 
 Effective backup root:
@@ -365,6 +415,53 @@ Build the inventory:
 node scripts/backup_r2/build_backup_inventory.mjs \
   --source-root "uk_aq_r2:${CFLARE_R2_BUCKET}" \
   --report-out ./tmp/r2_backup_inventory_report.json
+```
+
+Show which backup version and default paths will be selected from env:
+
+```bash
+node scripts/backup_r2/build_backup_inventory.mjs --show-version
+node scripts/backup_r2/sync_history_to_dropbox.mjs --show-version
+```
+
+Build the CIC-Test v2 inventory:
+
+```bash
+UK_AQ_R2_HISTORY_BACKUP_VERSION=v2 \
+node scripts/backup_r2/build_backup_inventory.mjs \
+  --source-root "uk_aq_r2:${CFLARE_R2_BUCKET}" \
+  --report-out ./tmp/r2_backup_inventory_v2_report.json
+```
+
+Sync CIC-Test v2 to Dropbox:
+
+```bash
+UK_AQ_R2_HISTORY_BACKUP_VERSION=v2 \
+node scripts/backup_r2/sync_history_to_dropbox.mjs \
+  --source-root "uk_aq_r2:${CFLARE_R2_BUCKET}" \
+  --dest-root "uk_aq_dropbox:CIC-Test/R2_history_backup" \
+  --report-out ./tmp/r2_history_dropbox_backup_v2_report.json
+```
+
+Verify the v2 active backup inventory exists:
+
+```bash
+rclone lsjson "uk_aq_r2:${CFLARE_R2_BUCKET}/history/_index_v2/backup_inventory_v2.json"
+rclone lsjson "uk_aq_dropbox:CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v2.json"
+```
+
+Verify the v1 backup still exists:
+
+```bash
+rclone lsjson "uk_aq_r2:${CFLARE_R2_BUCKET}/history/_index/backup_inventory_v1.json"
+rclone lsjson "uk_aq_dropbox:CIC-Test/R2_history_backup/_ops/checkpoints/r2_history_backup_state_v1.json"
+```
+
+Report total v2 Dropbox storage size:
+
+```bash
+rclone size "uk_aq_dropbox:CIC-Test/R2_history_backup/history/v2"
+rclone size "uk_aq_dropbox:CIC-Test/R2_history_backup/history/_index_v2"
 ```
 
 Then sync to Dropbox:

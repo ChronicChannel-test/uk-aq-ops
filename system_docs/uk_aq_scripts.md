@@ -88,10 +88,10 @@ system doc.
 ## R2 history backup scripts
 
 - `scripts/backup_r2/build_backup_inventory.mjs`
-  - Walks R2, etag-skips unchanged manifests, writes `history/_index/backup_inventory_v1.json`.
+  - Walks R2, etag-skips unchanged manifests, writes the selected backup inventory (`history/_index/backup_inventory_v1.json` or `history/_index_v2/backup_inventory_v2.json`).
   - The slow scan only fires once (first build) and for changed entries thereafter.
 - `scripts/backup_r2/sync_history_to_dropbox.mjs`
-  - Reads the inventory, compares hashes to the Dropbox checkpoint, copies only changed/missing units.
+  - Reads the selected inventory, compares hashes to the matching Dropbox checkpoint (`r2_history_backup_state_v1.json` or `r2_history_backup_state_v2.json`), copies only changed/missing units.
   - Retries Dropbox write-rate throttle errors (`too_many_write_operations`) with exponential backoff before failing the run.
   - Fails loudly if the inventory is missing/invalid; no fallback to direct scan.
 - `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
