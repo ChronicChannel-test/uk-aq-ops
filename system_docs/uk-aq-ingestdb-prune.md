@@ -209,6 +209,11 @@ Key optional controls:
 R2 history v2 writer support:
 - v1 remains the default write path.
 - v2 observations are pollutant-partitioned and use `connector_id`, `station_id`, `timeseries_id`, `pollutant_code`, `observed_at_utc`, `value`.
+- v2 daily prune rows come from `uk_aq_ops.uk_aq_phase_b_history_rows_v2(...)`,
+  which resolves `pollutant_code` in Postgres via
+  `observations -> timeseries -> phenomena -> observed_properties`.
+- v2 daily prune includes all observations with a known pollutant code; it is
+  not limited to AQI pollutants.
 - v2 AQI hourly writes are split into compact `data` parquet and richer `debug` parquet.
 - v2 AQI debug parquet intentionally excludes old wide compatibility fields such as `pm25_rolling24h_mean_ugm3` and `updated_at`.
 - Validate the writer schema with `node --test tests/phase_b_history_r2.test.mjs`.

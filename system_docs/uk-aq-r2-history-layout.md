@@ -161,6 +161,18 @@ observed_at_utc
 value
 ```
 
+Daily prune v2 source:
+
+- `workers/uk_aq_prune_daily/phase_b_history_r2.mjs` uses
+  `uk_aq_ops.uk_aq_phase_b_history_rows_v2(...)` only when
+  `UK_AQ_R2_HISTORY_WRITE_VERSION=v2`.
+- The v2 function resolves pollutant metadata in Postgres with the safe join
+  `observations -> timeseries -> phenomena -> observed_properties`.
+- `observed_properties.code` becomes `pollutant_code`; all rows with a known
+  code are eligible, including non-AQI pollutants such as `o3`.
+- The daily prune path remains Supabase/Postgres sourced. It does not read
+  Dropbox or R2 core snapshots for pollutant resolution.
+
 Legacy writer schema V1, archived/older only:
 
 | Ordinal | Column |
