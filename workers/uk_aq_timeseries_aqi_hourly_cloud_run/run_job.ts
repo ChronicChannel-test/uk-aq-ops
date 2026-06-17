@@ -14,7 +14,6 @@ type RunMode = "sync_hourly" | "backfill" | "reconcile_short" | "reconcile_deep"
 
 type HelperRow = {
   timeseries_id: number;
-  station_id: number | null;
   connector_id: number;
   pollutant_code: "no2" | "pm25" | "pm10";
   timestamp_hour_utc: string;
@@ -374,9 +373,6 @@ function parseHelperRows(payload: unknown): HelperRow[] {
     const timeseriesId = Number(row.timeseries_id);
     const connectorId = Number(row.connector_id);
     const pollutantCode = String(row.pollutant_code || "").trim().toLowerCase();
-    const stationId = row.station_id === null || row.station_id === undefined
-      ? null
-      : Number(row.station_id);
     const timestampRaw = String(row.timestamp_hour_utc || "").trim();
     if (
       !Number.isInteger(timeseriesId) || timeseriesId <= 0 ||
@@ -389,9 +385,6 @@ function parseHelperRows(payload: unknown): HelperRow[] {
 
     rows.push({
       timeseries_id: Math.trunc(timeseriesId),
-      station_id: Number.isInteger(stationId) && stationId !== null && stationId > 0
-        ? Math.trunc(stationId)
-        : null,
       connector_id: Math.trunc(connectorId),
       pollutant_code: pollutantCode as "no2" | "pm25" | "pm10",
       timestamp_hour_utc: hourIso(new Date(Date.parse(timestampRaw))),

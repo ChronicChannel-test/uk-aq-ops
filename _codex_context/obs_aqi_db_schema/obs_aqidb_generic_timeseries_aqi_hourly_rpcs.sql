@@ -172,7 +172,7 @@ begin
   with incoming_raw as (
     select
       r.timeseries_id,
-      r.station_id,
+      r.station_id as source_station_id,
       r.connector_id,
       lower(nullif(trim(r.pollutant_code), '')) as pollutant_code,
       date_trunc('hour', r.timestamp_hour_utc) as timestamp_hour_utc,
@@ -229,7 +229,10 @@ begin
   incoming_base as (
     select
       r.timeseries_id,
-      coalesce(r.station_id, ts.station_id) as station_id,
+      -- station_id is intentionally derived from ObsAQIDB core reference data.
+      -- Helper rows originate in IngestDB, where numeric station ids may not match ObsAQIDB ids.
+      ts.station_id,
+      r.source_station_id,
       r.connector_id,
       r.pollutant_code,
       r.timestamp_hour_utc,
