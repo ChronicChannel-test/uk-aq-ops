@@ -63,7 +63,6 @@ Read endpoints:
     - AQI history route: up to 2 attempts with linear backoff
     - retry statuses: `502`, `503`, `504`
     - AQI history `503` responses with Cloudflare Error 1102 / "Worker exceeded resource limits" HTML are not retried, because retrying repeats the same CPU/R2-heavy upstream work inside the same browser request path
-  - in v2 mode, historical-only AQI requests use caller `connector_id` first, then R2 timeseries metadata if connector context is omitted; ObsAQIDB context lookup is compatibility fallback and remains used for recent/retention windows
 - `/api/aq/postcode_lookup` -> external postcode lookup R2 API URL (`UK_AQ_POSTCODE_LOOKUP_R2_API_URL`)
   - uses the long-lived postcode cache profile (`max-age=86400`)
 - `/api/aq/postcode_suggest` -> external postcode suggest R2 API URL (`UK_AQ_POSTCODE_SUGGEST_R2_API_URL`)
