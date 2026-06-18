@@ -32,18 +32,13 @@ Read endpoints:
 
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
-  - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) performs central source routing in the cache proxy
+  - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now forwards the stitched origin payload from `uk_aq_timeseries` without re-stitching observations in the cache proxy
   - `connector_id` is part of the canonical v2 cache key when supplied by the caller
   - caller-supplied `connector_id` is used for R2 observations history reads before the compatibility Supabase connector lookup
-  - source modes:
-    - `history_only`: use R2 observations only; do not call Supabase/IngestDB when `connector_id` is supplied
-    - `recent_only`: use the existing Supabase/IngestDB origin path only
-    - `recent_history_stitched`: use R2 for the historical segment and Supabase/IngestDB for the recent tail
+  - the origin edge function owns the observation source split: ingestdb for the retention range, R2-preferred plus ingestdb missing-hour fill for the one-day overlap, and R2-only for historical ranges
   - the proxy does not use ObsAQIDB for observation line data
-  - response metadata includes `source_mode`, `used_r2`, `used_supabase`, `r2_row_count`, `ingest_row_count`, `response_complete`, and `has_gap`
-  - `source_routing_decision` is returned only when the caller sends `debug=1`
   - incomplete `v=2` responses are returned with `Cache-Control: no-store` and are not written to the Worker cache when origin metadata reports `response_complete=false`, `has_gap=true`, or upstream R2/ingest errors
-  - response headers include `X-UK-AQ-Timeseries-Cacheable`, `X-UK-AQ-Timeseries-Source-Mode`, `X-UK-AQ-Used-R2`, `X-UK-AQ-Used-Supabase`, and, when present in origin metadata, `X-UK-AQ-Response-Complete`
+  - response headers include `X-UK-AQ-Timeseries-Cacheable` and, when present in origin metadata, `X-UK-AQ-Response-Complete`
   - response headers still include the cache key version and the usual cache headers for the returned payload
 - `/api/aq/stations-chart` -> `uk_aq_stations_chart`
 - `/api/aq/stations` -> `uk_aq_stations`
