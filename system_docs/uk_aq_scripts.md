@@ -97,6 +97,7 @@ system doc.
 - `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
   - Rebuilds R2 history latest/index manifests for `observations`, `aqilevels`, or both.
   - For `--history-version v2`, full rebuilds also write direct timeseries metadata objects at `history/_index_v2/timeseries/timeseries_id=<id>.json` so historical readers can resolve connector context without Supabase when callers omit `connector_id`.
+    Those metadata objects are derived from actual v2 data pollutant partitions and their matching timeseries index manifests, not from a full connector-by-pollutant expected grid.
   - Supports targeted observations rebuilds via:
     - `--target YYYY-MM-DD:connector_id` (repeatable)
     - `--targets-csv <path>` where CSV includes `day_utc,connector_id`.
