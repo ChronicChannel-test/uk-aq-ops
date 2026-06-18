@@ -33,8 +33,6 @@ Read endpoints:
 - `/api/aq/latest` -> `uk_aq_latest`
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
   - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) now forwards the stitched origin payload from `uk_aq_timeseries` without re-stitching observations in the cache proxy
-  - `connector_id` is part of the canonical v2 cache key when supplied by the caller
-  - caller-supplied `connector_id` is used for R2 observations history reads before the compatibility Supabase connector lookup
   - the origin edge function owns the observation source split: ingestdb for the retention range, R2-preferred plus ingestdb missing-hour fill for the one-day overlap, and R2-only for historical ranges
   - the proxy does not use ObsAQIDB for observation line data
   - incomplete `v=2` responses are returned with `Cache-Control: no-store` and are not written to the Worker cache when origin metadata reports `response_complete=false`, `has_gap=true`, or upstream R2/ingest errors

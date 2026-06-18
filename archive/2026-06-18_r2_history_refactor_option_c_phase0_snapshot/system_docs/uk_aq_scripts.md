@@ -284,4 +284,4 @@ See [`uk-aq-r2-history-dropbox-backup.md`](uk-aq-r2-history-dropbox-backup.md) f
 
 - `scripts/uk_aq_cache_proxy/check_timeseries_v2_skeleton.mjs`
   - Lightweight normalization checks for `/api/aq/timeseries?v=2` skeleton behavior.
-  - Verifies flag gating, canonical query normalization (`timeseries_id`, `connector_id`, `pollutant`, `window`, `since`, `start_utc`, `end_utc`, `format`, `v`), and cache-buster stripping behavior.
+  - Verifies flag gating, canonical query normalization (`timeseries_id`, `window`, `since`, `start_utc`, `end_utc`, `format`, `v`), and cache-buster stripping behavior.
