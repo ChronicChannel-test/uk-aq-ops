@@ -34,14 +34,13 @@ Read endpoints:
 - `/api/aq/timeseries` -> `uk_aq_timeseries`
   - `v=2` path (gated by `UK_AQ_TIMESERIES_V2_ENABLED` + `UK_AQ_TIMESERIES_PROXY_FIRST`) performs central source routing in the cache proxy
   - `connector_id` is part of the canonical v2 cache key when supplied by the caller
-  - caller-supplied `connector_id` is used for R2 observations history reads without any connector lookup
-  - if older callers omit `connector_id`, the proxy tries the observations R2 API metadata route (`/v1/timeseries-metadata`) before the compatibility Supabase connector lookup
+  - caller-supplied `connector_id` is used for R2 observations history reads before the compatibility Supabase connector lookup
   - source modes:
     - `history_only`: use R2 observations only; do not call Supabase/IngestDB when `connector_id` is supplied
     - `recent_only`: use the existing Supabase/IngestDB origin path only
     - `recent_history_stitched`: use R2 for the historical segment and Supabase/IngestDB for the recent tail
   - the proxy does not use ObsAQIDB for observation line data
-  - response metadata includes `source_mode`, `used_r2`, `used_supabase`, `connector_id_source`, `used_r2_timeseries_metadata_lookup`, `r2_row_count`, `ingest_row_count`, `response_complete`, and `has_gap`
+  - response metadata includes `source_mode`, `used_r2`, `used_supabase`, `r2_row_count`, `ingest_row_count`, `response_complete`, and `has_gap`
   - `source_routing_decision` is returned only when the caller sends `debug=1`
   - incomplete `v=2` responses are returned with `Cache-Control: no-store` and are not written to the Worker cache when origin metadata reports `response_complete=false`, `has_gap=true`, or upstream R2/ingest errors
   - response headers include `X-UK-AQ-Timeseries-Cacheable`, `X-UK-AQ-Timeseries-Source-Mode`, `X-UK-AQ-Used-R2`, `X-UK-AQ-Used-Supabase`, and, when present in origin metadata, `X-UK-AQ-Response-Complete`
@@ -102,7 +101,6 @@ Variables:
 - `UK_AQ_TIMESERIES_HISTORICAL_BROWSER_TTL_SECONDS` (optional; default `86400`)
 - `UK_AQ_TIMESERIES_HISTORICAL_SWR_SECONDS` (optional; default `86400`)
 - `UK_AQ_TIMESERIES_STALE_IF_ERROR_SECONDS` (optional; default `300`)
-- `UK_AQ_R2_HISTORY_V2_TIMESERIES_METADATA_INDEX_PREFIX` (optional on the observations R2 API worker; default `history/_index_v2/timeseries`)
 - `UK_AQ_TIMESERIES_R2_MANIFEST_URL` (optional diagnostics)
 - `UK_AQ_TIMESERIES_R2_INDEX_URL` (optional diagnostics)
 - `UK_AQ_WEBSITE_DEBUG_LOG_ENABLED` (website build variable; optional; default `false`)
