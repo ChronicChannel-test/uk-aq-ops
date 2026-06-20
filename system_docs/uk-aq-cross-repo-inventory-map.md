@@ -4,7 +4,7 @@ Last updated: 2026-04-23
 
 ## Repository Roles
 
-- Main orchestrator repo: `CIC-test-uk-aq-ingest`
+- Main orchestrator repo: `CIC-test-uk-aq-ops`
 - Canonical schema repo: `CIC-test-uk-aq-schema` (`schemas/` is source of truth)
 - Ops runtime repo: `CIC-test-uk-aq-ops`
 - Web UI repo: `CIC-test-uk-aq`
@@ -178,4 +178,3 @@ Last updated: 2026-04-23
 - Write path: ingest/population repos write to tables, views, and RPCs defined in `CIC-test-uk-aq-schema`.
 - History/retention/backups: runtime ops execute from `CIC-test-uk-aq-ops` against schema-defined objects.
 - Recommended change sequence: schema changes first, then ingest/ops runtime updates, then web behavior validation.
-

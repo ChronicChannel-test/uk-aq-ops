@@ -98,11 +98,6 @@ system doc.
   - Rebuilds R2 history latest/index manifests for `observations`, `aqilevels`, or both.
   - For `--history-version v2`, full rebuilds also write direct timeseries metadata objects at `history/_index_v2/timeseries/timeseries_id=<id>.json` so historical readers can resolve connector context without Supabase when callers omit `connector_id`.
     Those metadata objects are derived from actual v2 data pollutant partitions and their matching timeseries index manifests, not from a full connector-by-pollutant expected grid.
-  - For `--history-version v2`, latest descriptors also emit
-    `day_summaries[].connectors[].row_count` from actual v2 pollutant manifest
-    row counts. The Ops dashboard R2 connector row-count charts depend on this
-    contract; after deploying index-builder changes, rebuild with
-    `node scripts/backup_r2/uk_aq_build_r2_history_index.mjs --history-version v2 --domain both`.
   - Supports targeted observations rebuilds via:
     - `--target YYYY-MM-DD:connector_id` (repeatable)
     - `--targets-csv <path>` where CSV includes `day_utc,connector_id`.

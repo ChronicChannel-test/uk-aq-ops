@@ -794,7 +794,7 @@ Latest descriptor fields:
 
 | Field | Type |
 |---|---|
-| `schema_version` | integer, `3` |
+| `schema_version` | integer, `2` |
 | `generated_at` | timestamp string, data-driven |
 | `source` | string, `r2_pollutant_manifests` |
 | `history_version` | string, `v2` |
@@ -808,7 +808,6 @@ Latest descriptor fields:
 | `min_day_utc` | string date/null |
 | `max_day_utc` | string date/null |
 | `day_count` | integer |
-| `total_rows` | integer, sum of `day_summaries[].connectors[].row_count` |
 | `connector_index_count` | integer |
 | `pollutant_index_count` | integer |
 | `file_count` | integer |
@@ -817,23 +816,6 @@ Latest descriptor fields:
 | `key_layout.pollutant_index_manifest_key_template` | string |
 | `key_layout.latest_key` | string |
 | `day_summaries` | object[] |
-
-`day_summaries[]` fields:
-
-| Field | Type |
-|---|---|
-| `day_utc` | string date |
-| `connector_count` | integer |
-| `connector_ids` | integer[] sorted ascending |
-| `connectors` | object[] sorted by `connector_id` |
-| `connectors[].connector_id` | integer |
-| `connectors[].row_count` | integer, actual source row count summed from v2 pollutant manifests |
-| `total_rows` | integer |
-| `pollutant_codes` | string[] sorted ascending |
-| `pollutant_index_count` | integer |
-| `file_count` | integer |
-| `indexed_file_count` | integer |
-| `backed_up_at_utc` | timestamp string/null |
 
 Per-pollutant index manifest fields:
 
