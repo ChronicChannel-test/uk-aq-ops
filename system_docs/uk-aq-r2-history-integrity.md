@@ -1339,7 +1339,16 @@ Delivered:
   cross-check discrepancies plus SOS `changed`/`reappeared` source-change
   targets are merged and deduped at `(connector_id, day_utc, timeseries_id)`.
   Observation repair runs with `source_to_r2 + observations_only`, and successful
-  repair queues one AQI rebuild per `(connector_id, day_utc)`.
+	  repair queues one AQI rebuild per `(connector_id, day_utc)`. The repair
+	  result is treated as successful for AQI queueing only when the structured
+	  wrapper output reports at least one `rows_observations` row. A wrapper
+	  `source_to_r2_connector_day_skipped` zero-row outcome is recorded as
+	  `no_observations`, while `source_to_r2_connector_day_pending` or a
+	  `stubbed` backfill run is recorded as source acquisition pending; neither
+	  queues AQI. Source-cache availability is retained as report evidence but
+	  does not gate the source-to-R2 repair attempt.
+	  AQI rebuilds from v2 R2 observations pass the known connector ID through the
+	  source-row mapper so normalized AQI rows retain connector scope.
 - Phase 7.5 adds SOS error-handling/reporting polish:
   explicit `no_data` vs `not_found` vs `temporary_error` vs `permanent_error`
   counters, optional not-found retry suppression via
@@ -1437,12 +1446,19 @@ Pass 2 (batching, logs, monitoring):
   followed by full stdout/stderr. Path is also stored in the event's
   `notes`.
 - **Chunk-safe observation repair.** When observation-repair chunking is
-  active, integrity injects targeted-stage env vars so non-final chunks stage
-  merged rows locally and the final chunk performs one commit:
+  active for cross-check repairs or direct v2 observation gap repairs, integrity
+  injects targeted-stage env vars so non-final chunks stage merged rows locally
+  and the final chunk performs one commit:
   - `UK_AQ_BACKFILL_TARGETED_STAGE_ENABLED=true`
-  - `UK_AQ_BACKFILL_TARGETED_STAGE_ROOT=state/<ENV>/logs/backfill/<run_compact>/_targeted_stage/run_<run_id>/day_<YYYY-MM-DD>/connector_<id>`
+  - `UK_AQ_BACKFILL_TARGETED_STAGE_ROOT=state/<ENV>/logs/backfill/<run_compact>/_targeted_stage/run_<run_id>|v2_run_<run_id>/day_<YYYY-MM-DD>/connector_<id>`
   - `UK_AQ_BACKFILL_TARGETED_STAGE_FINALIZE=false|true` (final chunk only true)
   - `UK_AQ_BACKFILL_TARGETED_STAGE_CLEANUP=false|true` (final chunk only true)
+  Non-final staged chunks skip the wrapper's targeted index update; the final
+  chunk is the only staged chunk that publishes R2 data and rebuilds the
+  affected index. Multi-chunk v2 observation repairs queue AQI only when the
+  runner sees the expected staged deferred commits, exactly one final
+  connector/day publish, and final row counts that do not shrink below the
+  staged baseline.
 - **Adaptive chunking first-pass.** If chunking is configured and a batch
   exceeds the chunk limit, integrity first tries one unchunked call
   (`UK_AQ_HISTORY_INTEGRITY_BACKFILL_TRY_UNCHUNKED_FIRST=true`, default). If
