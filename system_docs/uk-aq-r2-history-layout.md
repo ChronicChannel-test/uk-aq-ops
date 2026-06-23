@@ -292,7 +292,7 @@ history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/connector_id=<id>/manifest.json
 history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/manifest.json
 ```
 
-R2 history v2 AQI hourly paths are split by profile and pollutant:
+R2 history v2 AQI hourly paths are split by profile and pollutant. A completed v2 AQI day is expected to have both `data` and `debug` day manifests under their separate profile prefixes:
 
 ```text
 history/v2/aqilevels/hourly/data/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/manifest.json

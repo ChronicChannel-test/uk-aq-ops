@@ -206,7 +206,7 @@ Mirrored v1 domain paths:
 - `history/v1/aqilevels/hourly/day_utc=YYYY-MM-DD/...`
 - `history/v1/core/day_utc=YYYY-MM-DD/...`
 
-Mirrored v2 domain paths:
+Mirrored v2 domain paths. For AQI hourly v2, both the compact `data` profile and richer `debug` profile are expected for a completed day:
 
 - `history/v2/observations/day_utc=YYYY-MM-DD/...`
 - `history/v2/aqilevels/hourly/data/day_utc=YYYY-MM-DD/...`
