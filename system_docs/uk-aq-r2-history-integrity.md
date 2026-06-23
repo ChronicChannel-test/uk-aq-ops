@@ -1458,7 +1458,11 @@ Pass 2 (batching, logs, monitoring):
   affected index. Multi-chunk v2 observation repairs queue AQI only when the
   runner sees the expected staged deferred commits, exactly one final
   connector/day publish, and final row counts that do not shrink below the
-  staged baseline.
+  staged baseline. Before queueing AQI, direct v2 observation repairs also read
+  the final connector/day manifest (direct R2 read when credentials are
+  available, local mirror fallback otherwise) and verify row totals, pollutant
+  coverage, and per-timeseries counts for source rows observed during the repair.
+  If final manifest coverage cannot be verified, AQI rebuild is not queued.
 - **Adaptive chunking first-pass.** If chunking is configured and a batch
   exceeds the chunk limit, integrity first tries one unchunked call
   (`UK_AQ_HISTORY_INTEGRITY_BACKFILL_TRY_UNCHUNKED_FIRST=true`, default). If
