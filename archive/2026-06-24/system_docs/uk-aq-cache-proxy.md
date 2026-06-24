@@ -36,17 +36,12 @@ Read endpoints:
   - `connector_id` is part of the canonical v2 cache key when supplied by the caller
   - caller-supplied `connector_id` is used for R2 observations history reads without any connector lookup
   - if older callers omit `connector_id`, the proxy tries the observations R2 API metadata route (`/v1/timeseries-metadata`) before the compatibility Supabase connector lookup
-  - when `UK_AQ_TIMESERIES_R2_FIRST=true` and `UK_AQ_OBSERVS_HISTORY_R2_API_URL` is configured, the proxy requests R2 observations for the full resolved chart range, including recent windows inside the Supabase retention period
-  - Supabase/IngestDB is then queried only for ranges not covered by R2 rows or R2 coverage diagnostics, capped by `UK_AQ_TIMESERIES_MAX_SUPABASE_TAIL_HOURS`; skipped fill ranges are reported in `meta.skipped_ingest_slices`
   - source modes:
-    - `r2_only`: R2 observations satisfied the request without a Supabase/IngestDB fill
-    - `r2_first_full_range`: recent or mixed-window request satisfied from the full-range R2 read without a Supabase/IngestDB fill
-    - `r2_plus_ingest_tail`: R2 rows were used first and Supabase/IngestDB filled only the uncovered tail
-    - `r2_plus_ingest_repairs`: R2 rows were used first and Supabase/IngestDB filled missing diagnostic/head slices
-    - `ingest_only_fallback`: R2 returned no usable rows and the origin path supplied the response
-    - `ingest_only_on_r2_error`: R2 failed and the origin path supplied the response under partial-error fallback rules
+    - `history_only`: use R2 observations only; do not call Supabase/IngestDB when `connector_id` is supplied
+    - `recent_only`: use the existing Supabase/IngestDB origin path only
+    - `recent_history_stitched`: use R2 for the historical segment and Supabase/IngestDB for the recent tail
   - the proxy does not use ObsAQIDB for observation line data
-  - response metadata includes `source_mode`, `used_r2`, `used_supabase`, `connector_id_source`, `used_r2_timeseries_metadata_lookup`, `r2_row_count`, `ingest_row_count`, `response_complete`, `has_gap`, `partial_reasons`, `ingest_slices`, and `skipped_ingest_slices`
+  - response metadata includes `source_mode`, `used_r2`, `used_supabase`, `connector_id_source`, `used_r2_timeseries_metadata_lookup`, `r2_row_count`, `ingest_row_count`, `response_complete`, and `has_gap`
   - `source_routing_decision` is returned only when the caller sends `debug=1`
   - incomplete `v=2` responses are returned with `Cache-Control: no-store` and are not written to the Worker cache when origin metadata reports `response_complete=false`, `has_gap=true`, or upstream R2/ingest errors
   - response headers include `X-UK-AQ-Timeseries-Cacheable`, `X-UK-AQ-Timeseries-Source-Mode`, `X-UK-AQ-Used-R2`, `X-UK-AQ-Used-Supabase`, and, when present in origin metadata, `X-UK-AQ-Response-Complete`
