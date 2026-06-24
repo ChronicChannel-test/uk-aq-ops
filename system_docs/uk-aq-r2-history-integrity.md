@@ -1344,14 +1344,17 @@ Delivered:
   Observation repair runs with `source_to_r2 + observations_only`, and successful
 	  repair queues one AQI rebuild per `(connector_id, day_utc)`. The repair
 	  result is treated as successful for AQI queueing only when the structured
-	  wrapper output reports at least one `rows_observations` row. A wrapper
-	  `source_to_r2_connector_day_skipped` zero-row outcome is recorded as
-	  `no_observations`, while `source_to_r2_connector_day_pending` or a
-	  `stubbed` backfill run is recorded as source acquisition pending; neither
-	  queues AQI. Source-cache availability is retained as report evidence but
-	  does not gate the source-to-R2 repair attempt.
-	  AQI rebuilds from v2 R2 observations pass the known connector ID through the
-	  source-row mapper so normalized AQI rows retain connector scope.
+	  wrapper output reports at least one `rows_observations` row and the final
+	  v2 observation manifest covers the rows actually published by that repair.
+	  Current source-cache counts that exceed the repaired manifest are reported
+	  as `source_counts_exceed_repaired_manifest` diagnostics, not as a blocking
+	  queue guard. A wrapper `source_to_r2_connector_day_skipped` zero-row outcome
+	  is recorded as `no_observations`, while `source_to_r2_connector_day_pending`
+	  or a `stubbed` backfill run is recorded as source acquisition pending;
+	  neither queues AQI. Source-cache availability is retained as report evidence
+	  but does not gate the source-to-R2 repair attempt. AQI rebuilds from v2 R2
+	  observations pass the known connector ID through the source-row mapper so
+	  normalized AQI rows retain connector scope.
 - V2 observation integrity also compares current source-cache coverage against
   each checked R2 v2 observation partition at `(connector_id, day_utc,
   pollutant_code, timeseries_id)` granularity. This is required because an R2
@@ -1364,6 +1367,10 @@ Delivered:
   repair path handles the connector/day. If current source counts are absent or
   pollutant metadata is unavailable, no stale-partition repair candidate is
   emitted.
+- V2 AQI integrity compares existing v2 AQI hourly data manifests against v2
+  observation partition manifests for the same connector/day/pollutant coverage.
+  This detects stale or missing AQI output even when no observation repair ran in
+  the same integrity execution.
 - Phase 7.5 adds SOS error-handling/reporting polish:
   explicit `no_data` vs `not_found` vs `temporary_error` vs `permanent_error`
   counters, optional not-found retry suppression via
@@ -1470,14 +1477,23 @@ Pass 2 (batching, logs, monitoring):
   - `UK_AQ_BACKFILL_TARGETED_STAGE_CLEANUP=false|true` (final chunk only true)
   Non-final staged chunks skip the wrapper's targeted index update; the final
   chunk is the only staged chunk that publishes R2 data and rebuilds the
-  affected index. Multi-chunk v2 observation repairs queue AQI only when the
-  runner sees the expected staged deferred commits, exactly one final
-  connector/day publish, and final row counts that do not shrink below the
-  staged baseline. Before queueing AQI, direct v2 observation repairs also read
-  the final connector/day manifest (direct R2 read when credentials are
-  available, local mirror fallback otherwise) and verify row totals, pollutant
-  coverage, and per-timeseries counts for source rows observed during the repair.
-  If final manifest coverage cannot be verified, AQI rebuild is not queued.
+	  affected index. Multi-chunk v2 observation repairs queue AQI only when the
+	  runner sees the expected staged deferred commits, exactly one final
+	  connector/day publish, and final row counts that do not shrink below the
+	  staged baseline. Before queueing AQI, direct v2 observation repairs also read
+	  the final connector/day manifest (direct R2 read when credentials are
+	  available, local mirror fallback otherwise) and verify:
+	  - manifest row count is at least the repair's published
+	    `rows_observations`
+	  - manifest pollutant coverage includes pollutant codes emitted by the repair
+	  - manifest per-timeseries counts cover explicit repaired/written counts when
+	    the wrapper reports them
+	  Current source-cache counts are retained for diagnosis only. When source
+	  counts exceed the final repaired manifest, the result records
+	  `source_counts_exceed_repaired_manifest` with source rows, manifest rows,
+	  repaired rows, source-minus-manifest delta, and sample low-count timeseries.
+	  If final manifest coverage for the actual repair output cannot be verified,
+	  AQI rebuild is not queued.
 - **Adaptive chunking first-pass.** If chunking is configured and a batch
   exceeds the chunk limit, integrity first tries one unchunked call
   (`UK_AQ_HISTORY_INTEGRITY_BACKFILL_TRY_UNCHUNKED_FIRST=true`, default). If
@@ -1719,6 +1735,15 @@ upstream archive contains.
   - `queued -> running -> complete`
   - `queued -> running -> failed`
   - duplicate queue rows for the same connector/day are marked `skipped`.
+- For v2 rebuilds queued from `obs_repaired`, a successful wrapper exit is
+  followed by a manifest coverage validation. The runner compares v2 AQI hourly
+  data manifests with the existing v2 observation pollutant manifests for the
+  same `(day_utc, connector_id, pollutant_code)`. Missing AQI manifests produce
+  `aqi_manifest_missing_after_obs_repair`; AQI row/timeseries counts below
+  observation manifest coverage produce `aqi_rows_below_observation_rows`.
+  Validation checks manifest row coverage only and does not require non-null DAQI
+  index values, so PM rows with insufficient samples remain valid when AQI rows
+  exist.
 - Observation repair status is not changed by AQI rebuild failures; AQI
   failures remain separate repair debt.
 - Dry-run emits planned AQI rebuild commands and deterministic planned
