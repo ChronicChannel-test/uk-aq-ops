@@ -1370,7 +1370,12 @@ Delivered:
 - V2 AQI integrity compares existing v2 AQI hourly data manifests against v2
   observation partition manifests for the same connector/day/pollutant coverage.
   This detects stale or missing AQI output even when no observation repair ran in
-  the same integrity execution.
+  the same integrity execution. Observation-backed v2 AQI data coverage gaps are
+  now executable: the runner groups them by `(connector_id, day_utc)`, queues one
+  AQI-only v2 rebuild with reason `aqi_integrity_obs_coverage_gap`, and preserves
+  connector scope through the existing AQI-only wrapper path. Index-only and
+  optional debug-only AQI gaps remain diagnostic/planned work unless data coverage
+  is also missing or stale.
 - Phase 7.5 adds SOS error-handling/reporting polish:
   explicit `no_data` vs `not_found` vs `temporary_error` vs `permanent_error`
   counters, optional not-found retry suppression via
@@ -1735,15 +1740,21 @@ upstream archive contains.
   - `queued -> running -> complete`
   - `queued -> running -> failed`
   - duplicate queue rows for the same connector/day are marked `skipped`.
-- For v2 rebuilds queued from `obs_repaired`, a successful wrapper exit is
-  followed by a manifest coverage validation. The runner compares v2 AQI hourly
-  data manifests with the existing v2 observation pollutant manifests for the
-  same `(day_utc, connector_id, pollutant_code)`. Missing AQI manifests produce
+- For v2 rebuilds queued from `obs_repaired` or
+  `aqi_integrity_obs_coverage_gap`, a successful wrapper exit is followed by a
+  manifest coverage validation. The runner compares v2 AQI hourly data manifests
+  with the existing v2 observation pollutant manifests for the same
+  `(day_utc, connector_id, pollutant_code)`. Missing AQI manifests produce
   `aqi_manifest_missing_after_obs_repair`; AQI row/timeseries counts below
   observation manifest coverage produce `aqi_rows_below_observation_rows`.
   Validation checks manifest row coverage only and does not require non-null DAQI
   index values, so PM rows with insufficient samples remain valid when AQI rows
-  exist.
+  exist. Internally consistent AQI manifests are not sufficient if v2 observations
+  were repaired after AQI was generated.
+- V2 AQI integrity bridge reports include
+  `v2_aqi_rebuilds_queued_from_integrity`,
+  `planned_v2_aqi_rebuilds_from_integrity`, and skipped diagnostics for
+  non-executable gaps or missing v2 observation evidence.
 - Observation repair status is not changed by AQI rebuild failures; AQI
   failures remain separate repair debt.
 - Dry-run emits planned AQI rebuild commands and deterministic planned
