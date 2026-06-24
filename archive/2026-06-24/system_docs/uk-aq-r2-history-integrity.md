@@ -195,8 +195,6 @@ UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-
 
 UK_AQ_BACKFILL_WRAPPER="/Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq-Operations/CIC-test-uk-aq-ops/scripts/uk_aq_backfill_local.sh"
 UK_AQ_BACKFILL_ENV_FILE="/PATH/TO/CIC-Test/backfill.env"
-
-UK_AQ_OPS_REPO_ROOT="/Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq-Operations/CIC-test-uk-aq-ops"
 ```
 
 ### LIVE env file
@@ -232,7 +230,6 @@ Additional vars are required conditionally by preflight, for example:
 - `UK_AQ_BACKFILL_WRAPPER` + `UK_AQ_BACKFILL_ENV_FILE` when `--run-backfill` is set.
 - `UK_AQ_BACKFILL_ENV_FILE` + `OBS_AQIDB_SUPABASE_URL` + `OBS_AQIDB_SECRET_KEY`
   (loaded from that file) when daily task health reporting is enabled.
-- `UK_AQ_OPS_REPO_ROOT` when deployed outside the main ops repo so the script can locate `workers/shared/r2_sigv4.mjs`.
 - `UK_AQ_HISTORY_INTEGRITY_DAILY_TASK_HEALTH_ENABLED` (default `true`) and
   `UK_AQ_HISTORY_INTEGRITY_DAILY_TASK_HEALTH_STRICT` (default `false`) control
   daily task health reporting behavior.
