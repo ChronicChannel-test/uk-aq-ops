@@ -119,7 +119,7 @@ Summary columns are intentionally narrow for terminal review:
 day_utc connector_id pol timeseries_id obs_rows aqi_rows obs_idx aqi_idx obs_idx_rows aqi_idx_rows status
 ```
 
-Manifest row counts are reported only when present in the manifest. The checker does not invent missing manifest counts.
+The `obs_idx_rows` and `aqi_idx_rows` fields are per-timeseries index manifest counts when the manifest exposes them. If a manifest only exposes a partition-level `row_count`, `rows`, `count`, or `record_count`, these fields are left blank for per-timeseries summary rows. The checker does not invent per-timeseries index counts from partition-level counts.
 
 ## Status Rules
 
