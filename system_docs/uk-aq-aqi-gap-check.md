@@ -75,7 +75,7 @@ python3 scripts/uk-aq-history-integrity/bin/uk-aq-aqi-gap-check.py \
   --connector-id 1 \
   --pollutant pm25 \
   --timeseries-id 218 \
-  --r2-history-root /path/to/local/r2-history-backup \
+  --r2-history-root /Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup \
   --out /tmp/uk-aq-aqi-gap-check
 ```
 
@@ -83,7 +83,7 @@ Root from environment:
 
 ```bash
 export UK_AQ_R2_HISTORY_VERSION=v2
-export UK_AQ_R2_HISTORY_DROPBOX_ROOT=/path/to/local/r2-history-backup
+export UK_AQ_R2_HISTORY_DROPBOX_ROOT=/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup
 python3 scripts/uk-aq-history-integrity/bin/uk-aq-aqi-gap-check.py \
   --from-day 2026-06-18 \
   --to-day 2026-06-20 \
