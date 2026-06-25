@@ -794,7 +794,10 @@ If a non-empty v2 AQI pollutant manifest is missing usable
 `timeseries_row_counts`, treat it as a manifest integrity issue. The index
 builder warns by default, can fail with `--strict-missing-timeseries-counts`,
 and can repair older affected manifests with
-`--compute-missing-timeseries-counts`.
+`--compute-missing-timeseries-counts`. Targeted v2 timeseries index updates
+refresh the direct `history/_index_v2/timeseries` metadata objects after the
+domain indexes are updated. That metadata rebuild is derived from existing v2
+timeseries index manifests and does not read parquet.
 
 The observations history API Worker reads this v2 layout only when
 `UK_AQ_R2_HISTORY_READ_VERSION=v2`. In that mode, requests must include a

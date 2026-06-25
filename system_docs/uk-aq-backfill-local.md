@@ -259,7 +259,14 @@ step run the targeted v2 AQI repair over the requested date window. If
 `UK_AQ_BACKFILL_CONNECTOR_IDS` contains exactly one integer, the wrapper also
 passes `--connector-id`; otherwise it stays date-targeted. Set
 `UK_AQ_BACKFILL_INDEX_STRICT_MISSING_TIMESERIES_COUNTS=true` to pass the strict
-guard through the wrapper.
+guard through the wrapper. The targeted v2 repair refreshes the v2
+`history/_index_v2/timeseries` metadata index after rewriting the AQI
+timeseries indexes; the metadata refresh is derived from existing v2 timeseries
+index manifests and does not read parquet.
+
+When repair is not enabled, the wrapper keeps the normal full index rebuild
+path. If `UK_AQ_R2_HISTORY_VERSION` is set to `v1` or `v2`, the wrapper passes
+that value to `uk_aq_build_r2_history_index.mjs --history-version` explicitly.
 
 These switches are optional and not enabled by default.
 

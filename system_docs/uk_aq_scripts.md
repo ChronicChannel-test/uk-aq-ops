@@ -61,10 +61,14 @@
     to skip the final full R2 history index rebuild after a successful run.
   - `UK_AQ_BACKFILL_REPAIR_MISSING_TIMESERIES_COUNTS` defaults to `false`; set
     it to `true` to make the final index step run a targeted v2 AQI repair with
-    `--compute-missing-timeseries-counts` for the requested day window.
+    `--compute-missing-timeseries-counts` for the requested day window. The
+    targeted v2 index update also refreshes `history/_index_v2/timeseries`
+    metadata from the updated timeseries index manifests.
   - `UK_AQ_BACKFILL_INDEX_STRICT_MISSING_TIMESERIES_COUNTS` defaults to
     `false`; set it to `true` to fail the final index step when non-empty v2
     AQI manifests still lack usable `timeseries_row_counts`.
+  - When `UK_AQ_R2_HISTORY_VERSION` is set to `v1` or `v2`, the wrapper passes
+    it explicitly to the normal final index rebuild as `--history-version`.
   - Full behavior and merge-mode details are documented in:
     - [`uk-aq-backfill-local.md`](uk-aq-backfill-local.md)
 
