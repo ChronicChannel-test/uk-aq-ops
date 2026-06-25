@@ -56,8 +56,7 @@ local Dropbox R2 history backup first, then falls back.
 
 Order:
 
-1. Local Dropbox R2 history backup (`UK_AQ_R2_HISTORY_DROPBOX_ROOT`, or
-   `UK_AQ_DROPBOX_ROOT` plus `UK_AQ_R2_HISTORY_DROPBOX_DIR` where supported)
+1. Local Dropbox R2 history backup (`UK_AQ_R2_HISTORY_DROPBOX_ROOT`)
 2. Live R2 API (if credentials present)
 3. Ingest DB metadata queries (fallback)
 
@@ -301,10 +300,7 @@ timeseries index update plus v2 timeseries metadata refresh.
 
 Recommended supporting vars in the backfill env file:
 
-- `UK_AQ_DROPBOX_ROOT=<env root, e.g. CIC-Test>` and
-  `UK_AQ_R2_HISTORY_DROPBOX_DIR=<relative backup dir, default R2_history_backup>`;
-  explicit `UK_AQ_R2_HISTORY_DROPBOX_ROOT=<absolute local Dropbox backup root>`
-  is still supported.
+- `UK_AQ_R2_HISTORY_DROPBOX_ROOT=<absolute local Dropbox backup root>`
 - `UK_AQ_BACKFILL_OPENAQ_RAW_MIRROR_ROOT=<absolute local OpenAQ cache root>`
 - `UK_AQ_BACKFILL_SOS_INTEGRITY_SNAPSHOT_ROOT=<absolute local integrity source-cache root>/uk_air_sos`
 - `CFLARE_R2_*` / `R2_*` credentials for live write

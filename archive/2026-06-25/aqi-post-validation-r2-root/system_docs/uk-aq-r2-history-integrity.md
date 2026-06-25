@@ -190,9 +190,8 @@ UK_AQ_HISTORY_INTEGRITY_LOCK_DIR="/Users/mikehinford/uk-aq-history-integrity/sta
 
 UK_AQ_HISTORY_INTEGRITY_DROPBOX_DB_COPY_PATH="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/uk-aq-history-integrity/uk_aq_history_integrity.sqlite"
 
-UK_AQ_DROPBOX_ROOT="CIC-Test"
-UK_AQ_R2_HISTORY_DROPBOX_DIR="R2_history_backup"
-UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup/history/v1/core"
+UK_AQ_R2_HISTORY_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history"
+UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT="/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/r2-history/history/v1/core"
 
 UK_AQ_BACKFILL_WRAPPER="/Users/mikehinford/Dropbox/Projects/CIC Website/CIC Air Quality Networks/CIC-test-uk-aq-Operations/CIC-test-uk-aq-ops/scripts/uk_aq_backfill_local.sh"
 UK_AQ_BACKFILL_ENV_FILE="/PATH/TO/CIC-Test/backfill.env"
@@ -229,12 +228,7 @@ UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT
 
 Additional vars are required conditionally by preflight, for example:
 
-- R2 history Dropbox root when cross-check is enabled (default). This may be
-  supplied as explicit `UK_AQ_R2_HISTORY_DROPBOX_ROOT`, or resolved locally from
-  `UK_AQ_DROPBOX_ROOT` plus `UK_AQ_R2_HISTORY_DROPBOX_DIR`. For the normal local
-  app-folder layout, `UK_AQ_DROPBOX_ROOT=CIC-Test` and
-  `UK_AQ_R2_HISTORY_DROPBOX_DIR=R2_history_backup` resolve to
-  `/Users/mikehinford/Dropbox/Apps/github-uk-air-quality-networks/CIC-Test/R2_history_backup`.
+- `UK_AQ_R2_HISTORY_DROPBOX_ROOT` when cross-check is enabled (default).
 - `UK_AQ_BACKFILL_WRAPPER` + `UK_AQ_BACKFILL_ENV_FILE` when `--run-backfill` is set.
 - `UK_AQ_BACKFILL_ENV_FILE` + `OBS_AQIDB_SUPABASE_URL` + `OBS_AQIDB_SECRET_KEY`
   (loaded from that file) when daily task health reporting is enabled.
@@ -319,7 +313,6 @@ UK_AQ_HISTORY_INTEGRITY_REPORT_DIR
 UK_AQ_HISTORY_INTEGRITY_LOCK_DIR
 UK_AQ_HISTORY_INTEGRITY_DROPBOX_DB_COPY_PATH
 UK_AQ_R2_HISTORY_DROPBOX_ROOT
-UK_AQ_DROPBOX_ROOT
 UK_AQ_CORE_SNAPSHOT_DROPBOX_ROOT
 UK_AQ_BACKFILL_WRAPPER
 UK_AQ_BACKFILL_ENV_FILE
