@@ -132,13 +132,17 @@ history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pol
 
 Dropbox R2 history backups are inventory-led. The inventory identifies changed
 day/domain units, sync copies those units with `rclone copy`, and then performs
-manifest-guided pruning inside the copied Dropbox unit. The current manifest(s)
-are the source of truth for Parquet parts: only destination `*.parquet` files
-inside the pruned unit that are absent from the manifest-referenced set are
-deleted. JSON manifests, checkpoints, inventory files, reports, logs, non-Parquet
-files, and files outside the unit are never deleted by this prune step. The
-default sync scope audits all inventory-listed units; use `--dry-run` to inspect
-intended deletes before a cleanup run.
+manifest-guided pruning inside inventory-listed Dropbox units. The current
+manifest(s) are the source of truth for Parquet parts: only destination
+`*.parquet` files inside the pruned unit that are absent from the
+manifest-referenced set are deleted. JSON manifests, checkpoints, inventory
+files, reports, logs, non-Parquet files, and files outside the unit are never
+deleted by this prune step. In v2 mode, successful prune/audit results are
+stored in Dropbox at `_ops/checkpoints/r2_history_backup_prune_state_v2.json`
+and keyed by unit path plus inventory `manifest_hash`, so later default
+`--prune-scope all` runs can skip units already proven clean. V1 has no prune
+checkpoint. Use `--force-prune-recheck` for a deliberate full v2 re-audit and
+`--dry-run` to inspect intended deletes without writing the prune checkpoint.
 
 ## Observations parquet schema
 

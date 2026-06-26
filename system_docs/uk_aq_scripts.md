@@ -104,6 +104,7 @@ system doc.
   - Reads the selected inventory, compares hashes to the matching Dropbox checkpoint (`r2_history_backup_state_v1.json` or `r2_history_backup_state_v2.json`), copies only changed/missing units.
   - Uses `rclone copy` for changed day/domain folders, then prunes obsolete destination-only `.parquet` files inside inventory-listed units by comparing actual Dropbox Parquet files to the current manifest-referenced file set.
   - Defaults to inventory-wide pruning with `--prune-scope all`; `--prune-scope changed` limits pruning to units copied in the current run.
+  - In v2 mode, stores prune/audit status in Dropbox at `_ops/checkpoints/r2_history_backup_prune_state_v2.json` so later runs can skip units already proven clean for the same inventory `manifest_hash`; `--force-prune-recheck` ignores that optimization for a deliberate re-audit.
   - Retries Dropbox write-rate throttle errors (`too_many_write_operations`) with exponential backoff before failing the run.
   - Fails loudly if the inventory is missing/invalid; no fallback to direct scan.
 - `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
