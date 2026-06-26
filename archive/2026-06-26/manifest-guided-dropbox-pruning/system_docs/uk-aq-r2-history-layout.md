@@ -130,16 +130,6 @@ history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pol
 history/v2/observations/day_utc=YYYY-MM-DD/connector_id=<id>/pollutant_code=<pollutant>/part-00000.parquet
 ```
 
-Dropbox R2 history backups are inventory-led. The inventory identifies changed
-day/domain units, sync copies those units with `rclone copy`, and then performs
-manifest-guided pruning inside the copied Dropbox unit. The current manifest(s)
-are the source of truth for Parquet parts: only destination `*.parquet` files
-inside the pruned unit that are absent from the manifest-referenced set are
-deleted. JSON manifests, checkpoints, inventory files, reports, logs, non-Parquet
-files, and files outside the unit are never deleted by this prune step. Use
-`sync_history_to_dropbox.mjs --prune-scope all --dry-run` to audit already
-unchanged inventory-listed units before a one-off cleanup.
-
 ## Observations parquet schema
 
 Metadata:
