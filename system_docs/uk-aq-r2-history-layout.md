@@ -136,9 +136,9 @@ manifest-guided pruning inside the copied Dropbox unit. The current manifest(s)
 are the source of truth for Parquet parts: only destination `*.parquet` files
 inside the pruned unit that are absent from the manifest-referenced set are
 deleted. JSON manifests, checkpoints, inventory files, reports, logs, non-Parquet
-files, and files outside the unit are never deleted by this prune step. Use
-`sync_history_to_dropbox.mjs --prune-scope all --dry-run` to audit already
-unchanged inventory-listed units before a one-off cleanup.
+files, and files outside the unit are never deleted by this prune step. The
+default sync scope audits all inventory-listed units; use `--dry-run` to inspect
+intended deletes before a cleanup run.
 
 ## Observations parquet schema
 

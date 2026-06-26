@@ -31,7 +31,7 @@ windows.
 
 The sync never scans R2 manifests directly. If the inventory is missing or invalid the sync fails loudly with an actionable message — there is no fallback to a slow direct scan. Recovery is to re-run the builder.
 
-Pruning is deliberately scoped. It never runs against the whole Dropbox backup tree, never deletes JSON manifests/checkpoints/inventory/log/report files, and never deletes non-Parquet files. The manifest is the source of truth for which Parquet parts should exist in a copied unit. If manifest parsing fails, or the expected Parquet set cannot be determined safely, the unit fails and its copy checkpoint is not advanced.
+Pruning is deliberately scoped. It never runs against the whole Dropbox backup tree, never deletes JSON manifests/checkpoints/inventory/log/report files, and never deletes non-Parquet files. The manifest is the source of truth for which Parquet parts should exist in a pruned inventory unit. If manifest parsing fails, or the expected Parquet set cannot be determined safely, the unit fails and any related copy checkpoint is not advanced.
 
 ```
        ┌───────────────────┐                ┌──────────────────┐
@@ -339,7 +339,7 @@ CLI:
 --state-rel-path <path>        optional override; default is version-specific
 --domain <name>                observations | aqilevels | aqilevels_debug | core
 --max-days-per-run <N>         safety throttle on day copies; 0 = unlimited
---prune-scope <changed|all>    default changed; all audits every inventory-listed day/domain unit
+--prune-scope <all|changed>    default all; changed limits pruning to copied day/domain units
 --no-prune-stale-parquet       disable manifest-guided stale Parquet pruning
 --rclone-bin <name>            default rclone
 --report-out <file>            write JSON report to file
@@ -362,8 +362,8 @@ Behaviour:
 
 Prune scopes:
 
-- `--prune-scope changed` (default): prune only day/domain units copied in this run.
-- `--prune-scope all`: after normal copy planning, audit/prune all inventory-listed day/domain units, including units skipped as unchanged or by `--max-days-per-run`. This is explicit; `UK_AQ_R2_HISTORY_BACKUP_MAX_DAYS_PER_RUN=0` means unlimited changed-day copying, not full-history pruning.
+- `--prune-scope all` (default): after normal copy planning, audit/prune all inventory-listed day/domain units, including units skipped as unchanged or by `--max-days-per-run`.
+- `--prune-scope changed`: prune only day/domain units copied in this run.
 
 `--dry-run` reports files that would be pruned without deleting anything. For changed units in dry-run mode, sync uses source manifests to emulate the expected post-copy manifest state while still listing current Dropbox destination Parquet files.
 
@@ -546,7 +546,7 @@ Per-domain safety throttle applied to the *day-folder* copy queue. Index files a
 
 - `1` = copy at most one day per domain (`observations`, `aqilevels`, `core`) per run.
 - `0` = unlimited.
-- It does not trigger or limit full-history pruning. Full inventory-wide pruning only happens when `--prune-scope all` is passed explicitly.
+- It does not limit inventory-wide pruning. The default `--prune-scope all` still audits/prunes every inventory-listed day/domain unit.
 
 Practical effect:
 
@@ -629,7 +629,7 @@ If a day was rewritten in R2 between runs, you'll see `copied_days >= 1` and the
 | Sync exits with "inventory has unexpected kind=..." | Wrong file at the inventory path | Move/delete that file, then re-run the builder |
 | Sync exits with "inventory has version=..." | Schema bump | Re-run builder (matching version is `1`) |
 | Sync exits during stale-Parquet pruning | A copied/audited unit has invalid manifests or unsafe Parquet path metadata, or Dropbox delete failed | Inspect `prune.units[].error` in the report; fix/re-copy the unit or rerun after the manifest issue is corrected |
-| Local Dropbox checks count too many rows for a day | Destination-only stale Parquet parts remained from an older `rclone copy` | Next backup run fixes changed units automatically; run sync with `--prune-scope all --dry-run` first, then without `--dry-run`, to clean already-unchanged days |
+| Local Dropbox checks count too many rows for a day | Destination-only stale Parquet parts remained from an older `rclone copy` | Next scheduled backup fixes inventory-listed days by default; use `--dry-run` first if you want to inspect intended deletions |
 | Builder report `metadata_warnings` non-empty | rclone/R2 didn't expose MD5 etag for some entries | Etag-skip degraded to ModTime fallback; investigate rclone backend version |
 | Builder re-reads thousands of tree units daily despite no source-data change | Upstream `uk_aq_r2_history_index.mjs` deployed without A.3/B idempotency (data-driven `generated_at` + `r2PutObjectIfChanged`) | Re-deploy `uk_aq_prune_daily` Cloud Run with the current shared module; confirm rebuilder result objects include `put_skipped` |
 | Sync copies thousands of tree units daily despite no source-data change | Same upstream cause as above (tree-unit bytes changing daily ⇒ checkpoint hash always differs from inventory hash) | Same fix as above |
