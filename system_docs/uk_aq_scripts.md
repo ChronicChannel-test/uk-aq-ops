@@ -106,6 +106,7 @@ system doc.
   - Defaults to inventory-wide pruning with `--prune-scope all`; `--prune-scope changed` limits pruning to units copied in the current run.
   - In v2 mode, stores prune/audit status in Dropbox at `_ops/checkpoints/r2_history_backup_prune_state_v2.json` so later runs can skip units already proven clean for the same inventory `manifest_hash`; `--force-prune-recheck` ignores that optimization for a deliberate re-audit.
   - Retries Dropbox write-rate throttle errors (`too_many_write_operations`) with exponential backoff before failing the run.
+  - Separately retries transient Dropbox destination `rclone cat` and `rclone lsjson` failures up to five attempts with bounded exponential backoff. Exhausted units remain untrusted; inventory-wide prune records them, continues auditing later units, and fails the run after the audit.
   - Fails loudly if the inventory is missing/invalid; no fallback to direct scan.
 - `scripts/backup_r2/uk_aq_build_r2_history_index.mjs`
   - Rebuilds R2 history latest/index manifests for `observations`, `aqilevels`, or both.

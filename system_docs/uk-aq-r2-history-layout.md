@@ -143,6 +143,12 @@ and keyed by unit path plus inventory `manifest_hash`, so later default
 `--prune-scope all` runs can skip units already proven clean. V1 has no prune
 checkpoint. Use `--force-prune-recheck` for a deliberate full v2 re-audit and
 `--dry-run` to inspect intended deletes without writing the prune checkpoint.
+Dropbox destination manifest reads and file listings use five bounded retry
+attempts for transient `path/not_folder`, rate-limit, timeout, server, and
+network-style rclone errors. This read/list retry is separate from Dropbox
+write-throttling retry. If attempts are exhausted, no deletion is planned from
+the incomplete information and the unit is not marked clean. Inventory-wide
+prune continues to later units to collect failures, then fails the overall run.
 
 ## Observations parquet schema
 

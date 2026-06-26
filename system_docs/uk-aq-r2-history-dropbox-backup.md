@@ -29,10 +29,11 @@ windows.
 2. **Sync** (`scripts/backup_r2/sync_history_to_dropbox.mjs`) reads that one inventory file, compares each entry's hash to the Dropbox-side checkpoint, and copies only the entries whose hashes differ.
 3. After each changed day/domain folder is copied with `rclone copy`, sync performs manifest-guided pruning inside that copied Dropbox unit: it reads the current copied manifest(s), builds the expected Parquet part set, lists actual destination `*.parquet` files, and deletes only destination-only Parquet parts absent from the manifest set.
 4. In v2 mode, sync records successful prune/audit results in a separate Dropbox prune checkpoint. Future v2 `--prune-scope all` runs skip units already proven clean for the same inventory `manifest_hash`.
+5. Dropbox destination `rclone cat` and `rclone lsjson` operations use a separate bounded read/list retry policy: five attempts with 10-second initial delay, exponential backoff, and a 60-second delay cap.
 
 The sync never scans R2 manifests directly. If the inventory is missing or invalid the sync fails loudly with an actionable message — there is no fallback to a slow direct scan. Recovery is to re-run the builder.
 
-Pruning is deliberately scoped. It never runs against the whole Dropbox backup tree, never deletes JSON manifests/checkpoints/inventory/log/report files, and never deletes non-Parquet files. The manifest is the source of truth for which Parquet parts should exist in a pruned inventory unit. If manifest parsing fails, or the expected Parquet set cannot be determined safely, the unit fails and any related copy checkpoint is not advanced.
+Pruning is deliberately scoped. It never runs against the whole Dropbox backup tree, never deletes JSON manifests/checkpoints/inventory/log/report files, and never deletes non-Parquet files. The manifest is the source of truth for which Parquet parts should exist in a pruned inventory unit. If manifest parsing fails, the expected Parquet set cannot be determined safely, or Dropbox read/list retries are exhausted, the unit remains untrusted and is not marked clean in the prune checkpoint. Any related copy checkpoint is not advanced.
 
 The prune checkpoint is an optimization only. Invalid v2 prune checkpoint JSON, kind, version, or backup version is ignored with a report warning, and sync falls back to rechecking selected units rather than trusting unsafe state.
 
@@ -412,11 +413,12 @@ Behaviour:
 6. **Plan index tree units**: same hash compare for the selected version's index tree manifests.
 7. **Plan run manifest units**: same hash compare for the selected version's Phase B run manifests. These are copied with `rclone copyto` and keep the same relative path in Dropbox.
 8. **Copy** queued units (`rclone copy` for day folders, `rclone copyto` for single files). Dropbox `too_many_write_operations` responses are retried with exponential backoff before the unit is treated as failed.
-9. **Prune stale Parquet inside copied day folders**. For each copied day/domain folder, sync reads the current copied manifest(s), compares manifest-referenced Parquet paths to actual destination `*.parquet` files under that same unit, and deletes only unreferenced destination Parquet files. This removes obsolete parts left by `rclone copy` after R2 rewrites a partition with fewer files.
-10. **Update copy checkpoint after copy + prune**. The day copy checkpoint is updated only after both the copy and the prune step succeed. Single-file units still checkpoint after successful `copyto`.
-11. **Audit/prune additional selected units**. With `--prune-scope all`, v2 units with current prune checkpoint entries are skipped; missing/stale entries are audited/pruned and recorded. With `--prune-scope changed`, unchanged units are not audited.
-12. **Write v2 prune checkpoint once**. Successful non-dry-run v2 prune updates are written once near the end of sync. Dry-run does not write the prune checkpoint.
-13. **No broad deletion propagation**: units in the checkpoint but absent from the inventory are ignored; manifests, checkpoint files, inventory files, reports, logs, non-Parquet files, and files outside the pruned unit are not removed from Dropbox.
+9. **Retry Dropbox reads/lists separately**. Destination `rclone cat` and `rclone lsjson` calls retry transient `path/not_folder`, rate-limit, timeout, server, and network-style failures. This policy is separate from write-throttling retry and does not apply to R2 inventory scans.
+10. **Prune stale Parquet inside copied day folders**. For each copied day/domain folder, sync reads the current copied manifest(s), compares manifest-referenced Parquet paths to actual destination `*.parquet` files under that same unit, and deletes only unreferenced destination Parquet files. This removes obsolete parts left by `rclone copy` after R2 rewrites a partition with fewer files.
+11. **Update copy checkpoint after copy + prune**. The day copy checkpoint is updated only after both the copy and the prune step succeed. Single-file units still checkpoint after successful `copyto`.
+12. **Audit/prune additional selected units**. With `--prune-scope all`, v2 units with current prune checkpoint entries are skipped; missing/stale entries are audited/pruned and recorded. After one audit failure, later inventory-listed units are still attempted so the report captures all failures. The overall run fails after the audit if any unit failed.
+13. **Write v2 prune checkpoint once**. Successful non-dry-run v2 prune updates are written once near the end of sync, including successful units from an inventory-wide audit that also had failed units. Failed units are never marked `status: "ok"`. Dry-run does not write the prune checkpoint.
+14. **No broad deletion propagation**: units in the checkpoint but absent from the inventory are ignored; manifests, checkpoint files, inventory files, reports, logs, non-Parquet files, and files outside the pruned unit are not removed from Dropbox.
 
 Prune scopes:
 
@@ -677,6 +679,10 @@ Builder writes a JSON report to `--report-out` (also echoed to stdout).
 | `prune.prune_deleted_count` | Actual stale destination-only Parquet files deleted |
 | `prune.prune_dry_run_delete_count` | Stale Parquet files that would be deleted in dry-run mode |
 | `prune.prune_error_count` | Units where manifest parsing, expected-path extraction, listing, or delete failed |
+| `prune.read_list_retry_count` | Dropbox destination read/list retries performed during prune audits |
+| `prune.read_list_retry_exhausted_count` | Dropbox destination read/list operations that exhausted all five attempts |
+| `prune.failed_units[]` | Failed unit path, final error, and number of attempts used |
+| `prune.continued_after_unit_failure` | Whether an inventory-wide audit attempted later units after an earlier failure |
 | `prune.pruned_relative_paths` | Capped list of pruned paths, relative to the Dropbox backup root |
 | `prune.manifest_referenced_parquet_count` | Total manifest-referenced Parquet paths counted across attempted units |
 | `prune.actual_destination_parquet_count` | Total destination Parquet files found across attempted units |
@@ -714,7 +720,7 @@ If a day was rewritten in R2 between runs, you'll see `copied_days >= 1` and the
 | Sync exits with "inventory is empty (zero bytes)" | A previous upload left a 0-byte placeholder | Run the builder; it overwrites with a fresh upload |
 | Sync exits with "inventory has unexpected kind=..." | Wrong file at the inventory path | Move/delete that file, then re-run the builder |
 | Sync exits with "inventory has version=..." | Schema bump | Re-run builder (matching version is `1`) |
-| Sync exits during stale-Parquet pruning | A copied/audited unit has invalid manifests or unsafe Parquet path metadata, or Dropbox delete failed | Inspect `prune.units[].error` in the report; fix/re-copy the unit or rerun after the manifest issue is corrected |
+| Sync exits during stale-Parquet pruning | A copied/audited unit has invalid manifests or unsafe Parquet path metadata, Dropbox read/list retry was exhausted, or Dropbox delete failed | Inspect `prune.failed_units[]` and `prune.units[].error`; fix/re-copy invalid units or rerun after a transient Dropbox failure |
 | `prune_checkpoint.warnings` reports invalid state | The v2 prune checkpoint is corrupt or has wrong metadata | Sync ignores it and rechecks selected units; a successful real run rewrites a valid checkpoint |
 | Local Dropbox checks count too many rows for a day | Destination-only stale Parquet parts remained from an older `rclone copy` | Next scheduled backup fixes inventory-listed days by default; use `--dry-run` first if you want to inspect intended deletions |
 | Builder report `metadata_warnings` non-empty | rclone/R2 didn't expose MD5 etag for some entries | Etag-skip degraded to ModTime fallback; investigate rclone backend version |
