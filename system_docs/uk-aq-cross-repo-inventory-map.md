@@ -41,7 +41,7 @@ Last updated: 2026-04-23
 
 - `workers/uk_aq_uk_air_sos_cloud_run/`
 - `workers/uk_aq_openaq_cloud_run/`
-- `workers/uk_aq_breathelondon_cloud_run/`
+- `workers/uk_aq_blondon_communities_cloud_run/`
 - `workers/uk_aq_sensorcommunity_cloud_run/`
 - `workers/uk_aq_observs_pubsub_cloud_run/`
 
@@ -52,7 +52,7 @@ Last updated: 2026-04-23
 - `uk_aq_dispatcher_deploy.yml`
 - `uk_aq_uk_air_sos_cloud_run_deploy.yml`
 - `uk_aq_openaq_cloud_run_deploy.yml`
-- `uk_aq_breathelondon_cloud_run_deploy.yml`
+- `uk_aq_blondon_communities_cloud_run_deploy.yml`
 - `uk_aq_scomm_cloud_run_deploy.yml`
 - `uk_aq_egress_monitor.yml`
 - `uk_aq_observs_egress_monitor.yml`

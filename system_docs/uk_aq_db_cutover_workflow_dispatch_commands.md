@@ -37,7 +37,7 @@ for wf in \
   uk_aq_observs_edge_deploy.yml \
   uk_aq_dispatcher_deploy.yml \
   uk_aq_observs_pubsub_cloud_run_deploy.yml \
-  uk_aq_breathelondon_cloud_run_deploy.yml \
+  uk_aq_blondon_communities_cloud_run_deploy.yml \
   uk_aq_uk_air_sos_cloud_run_deploy.yml \
   uk_aq_openaq_cloud_run_deploy.yml \
   uk_aq_scomm_cloud_run_deploy.yml

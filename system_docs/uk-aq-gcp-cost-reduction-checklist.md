@@ -44,7 +44,7 @@ gcloud scheduler jobs resume uk-aq-db-size-logger-hourly \
 
 - `uk-aq-sos-trigger`
 - `uk-aq-openaq-safety-trigger`
-- `uk-aq-breathelondon-trigger`
+- `uk-aq-blondon-communities-trigger`
 - `uk-aq-scomm-trigger`
 
 These support connector ingest reliability and can affect data freshness if paused.

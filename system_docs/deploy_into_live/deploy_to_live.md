@@ -603,7 +603,7 @@ Complete Phase 0.4 before this step. Then add the following to the **LIVE-uk-aq-
 | `SB_SECRET_KEY` | live Supabase service role key |
 | `OBS_AQIDB_SECRET_KEY` | live obs_aqidb service role key |
 | `OPENAQ_API_KEY` | live OpenAQ API key (different from test) |
-| `BREATHELONDON_API_KEY` | same as test |
+| `BLONDON_COMMUNITIES_API_KEY` | same as test |
 | `SB_UK_AQ_CRON_SECRET` | same as test |
 | `DROPBOX_APP_KEY` | same as test |
 | `DROPBOX_APP_SECRET` | same as test |
@@ -629,7 +629,7 @@ Complete Phase 0.4 before this step. Then add the following to the **LIVE-uk-aq-
 | `UK_AQ_DROPBOX_ROOT` | `/LIVE` |
 | `GCP_OPENAQ_JOB_SERVICE_ACCOUNT` | `uk-aq-openaq-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
 | `GCP_SCOMM_JOB_SERVICE_ACCOUNT` | `uk-aq-scomm-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
-| `GCP_BREATHELONDON_JOB_SERVICE_ACCOUNT` | `uk-aq-breathelondon-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
+| `GCP_BLONDON_COMMUNITIES_JOB_SERVICE_ACCOUNT` | existing `uk-aq-breathelondon-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` identity |
 | `GCP_UK_AIR_SOS_JOB_SERVICE_ACCOUNT` | `uk-aq-sos-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
 | `GCP_OBSERVS_PUBSUB_SERVICE_ACCOUNT` | `uk-aq-observs-pubsub-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
 | `GCP_OPS_JOB_SERVICE_ACCOUNT` | `uk-aq-ops-job@project-44502c75-19dc-456a-800.iam.gserviceaccount.com` |
@@ -638,7 +638,7 @@ Complete Phase 0.4 before this step. Then add the following to the **LIVE-uk-aq-
 **Workflow files to copy from test repo** (values come from secrets/vars — no edits needed):
 - `uk_aq_openaq_cloud_run_deploy.yml`
 - `uk_aq_scomm_cloud_run_deploy.yml`
-- `uk_aq_breathelondon_cloud_run_deploy.yml`
+- `uk_aq_blondon_communities_cloud_run_deploy.yml`
 - `uk_aq_uk_air_sos_cloud_run_deploy.yml`
 - `uk_aq_observs_pubsub_cloud_run_deploy.yml`
 - `uk_aq_dispatcher_deploy.yml`
@@ -659,7 +659,7 @@ Trigger each workflow via GitHub Actions → Run workflow, in this order:
 
 ### 6.3 Deploy ingest Cloud Run services (from LIVE-uk-aq-ingest)
 
-1. `uk_aq_breathelondon_cloud_run_deploy.yml`
+1. `uk_aq_blondon_communities_cloud_run_deploy.yml`
 2. `uk_aq_uk_air_sos_cloud_run_deploy.yml`
 3. `uk_aq_openaq_cloud_run_deploy.yml`
 4. `uk_aq_scomm_cloud_run_deploy.yml`
