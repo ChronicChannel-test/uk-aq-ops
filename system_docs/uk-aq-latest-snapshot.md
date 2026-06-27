@@ -41,7 +41,7 @@ Build frequency is every minute via Cloud Scheduler.
 ## Request Flow
 
 1. Cloud Scheduler triggers Cloud Run service every minute.
-2. Cloud Run accepts one active child build. Overlapping scheduler requests return HTTP `200` with `skipped: true` and in-flight age details.
+2. Cloud Run accepts one active child build. At the default `0.25` CPU and concurrency `1`, overlap requests may wait at Cloud Run. With CPU `1` or higher and concurrency `2`, they reach the application and return HTTP `200` with `skipped: true` and in-flight age details.
 3. Cloud Run service pulls Pub/Sub observations from the latest-snapshot subscription.
 4. Service updates R2 latest-state object.
 5. Service acknowledges pulled Pub/Sub messages in bounded chunks to stay below Pub/Sub request-size limits during burst/backlog drains.
@@ -100,7 +100,7 @@ Cloud Run builder controls:
 - `GCP_LATEST_SNAPSHOT_SERVICE_TIMEOUT_SECONDS` (default `300`)
 - `GCP_LATEST_SNAPSHOT_SERVICE_CPU` (default `0.25`)
 - `GCP_LATEST_SNAPSHOT_SERVICE_MEMORY` (default `256Mi`)
-- `GCP_LATEST_SNAPSHOT_SERVICE_CONCURRENCY` (default `2`; must be at least `2` so overlaps can return a fast skip)
+- `GCP_LATEST_SNAPSHOT_SERVICE_CONCURRENCY` (default `1`; required when CPU is below `1`)
 - `GCP_LATEST_SNAPSHOT_SERVICE_MAX_INSTANCES` (default and required value `1`)
 - `GCP_LATEST_SNAPSHOT_SERVICE_MIN_INSTANCES` (default `0`)
 - `UK_AQ_LATEST_SNAPSHOT_JOB_TIMEOUT_MS` (default `240000`; child receives `SIGTERM`, then `SIGKILL` after 10 seconds)
@@ -176,8 +176,8 @@ Cloud Run builder fails with `Request payload size exceeds the limit: 524288 byt
 Cloud Scheduler repeatedly reports `409` or snapshots stop advancing:
 
 1. This indicates an old revision may have retained `inFlight=true` while its child process remained hung.
-2. Redeploy the current Cloud Run builder. Deployment replaces the stuck instance and enforces `max-instances=1`, concurrency of at least `2`, and the bounded child timeout.
-3. Keep the scheduler at every minute. Normal overlap now returns HTTP `200` with `reason: "run_in_flight"` rather than an error.
+2. Redeploy the current Cloud Run builder. Deployment replaces the stuck instance and enforces `max-instances=1`, CPU-compatible concurrency, and the bounded child timeout.
+3. Keep the scheduler at every minute. At the default concurrency `1`, overlap requests may wait at Cloud Run; they cannot remain blocked indefinitely because the active child is bounded. With CPU `1` or higher and concurrency `2`, normal overlap returns HTTP `200` with `reason: "run_in_flight"`.
 4. Inspect structured events `latest_snapshot_child_timeout`, `latest_snapshot_child_kill_escalated`, and `latest_snapshot_run_failed`.
 5. Metadata, Pub/Sub, and R2 requests have a 30-second per-attempt timeout, so a hung external request cannot retain the child indefinitely.
 
