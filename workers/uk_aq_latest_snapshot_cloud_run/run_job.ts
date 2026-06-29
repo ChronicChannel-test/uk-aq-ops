@@ -337,6 +337,10 @@ const UK_AQ_LATEST_SNAPSHOT_METADATA_REFRESH_SECONDS = parsePositiveInt(
   Deno.env.get("UK_AQ_LATEST_SNAPSHOT_METADATA_REFRESH_SECONDS"),
   86400,
 );
+const UK_AQ_LATEST_SNAPSHOT_FORCE_METADATA_REFRESH = parseBoolean(
+  Deno.env.get("UK_AQ_LATEST_SNAPSHOT_FORCE_METADATA_REFRESH"),
+  false,
+);
 const UK_AQ_LATEST_SNAPSHOT_CORE_LOOKBACK_DAYS = 14;
 const UK_AQ_LATEST_SNAPSHOT_MAX_STATE_ENTRIES = 500_000;
 
@@ -1144,32 +1148,34 @@ function mapObservedPropertyRows(rows: Array<Record<string, unknown>>): Metadata
   return output;
 }
 
-async function loadMetadataIndex(): Promise<{ metadata: MetadataIndex; stats: MetadataRefreshStats }> {
+export async function loadMetadataIndex(): Promise<{ metadata: MetadataIndex; stats: MetadataRefreshStats }> {
   const startedMs = Date.now();
   let objectsRead = 0;
   let bytesRead = 0;
 
-  try {
-    const cacheObject = await r2GetObject({ r2: R2_CONFIG, key: UK_AQ_LATEST_SNAPSHOT_CORE_METADATA_CACHE_KEY });
-    objectsRead += 1;
-    bytesRead += cacheObject.body.byteLength;
-    const text = new TextDecoder().decode(cacheObject.body);
-    const parsed = JSON.parse(text) as CoreMetadataCacheFile;
-    if (parsed && parsed.schema_version === 2 && Array.isArray(parsed.networks) && isMetadataCacheFresh(parsed)) {
-      return {
-        metadata: buildMetadataIndex(parsed),
-        stats: {
-          refreshed: false,
-          source_day_utc: parsed.source_day_utc || null,
-          objects_read: objectsRead,
-          bytes_read: bytesRead,
-          cache_bytes_written: 0,
-          duration_ms: Date.now() - startedMs,
-        },
-      };
+  if (!UK_AQ_LATEST_SNAPSHOT_FORCE_METADATA_REFRESH) {
+    try {
+      const cacheObject = await r2GetObject({ r2: R2_CONFIG, key: UK_AQ_LATEST_SNAPSHOT_CORE_METADATA_CACHE_KEY });
+      objectsRead += 1;
+      bytesRead += cacheObject.body.byteLength;
+      const text = new TextDecoder().decode(cacheObject.body);
+      const parsed = JSON.parse(text) as CoreMetadataCacheFile;
+      if (parsed && parsed.schema_version === 2 && Array.isArray(parsed.networks) && isMetadataCacheFresh(parsed)) {
+        return {
+          metadata: buildMetadataIndex(parsed),
+          stats: {
+            refreshed: false,
+            source_day_utc: parsed.source_day_utc || null,
+            objects_read: objectsRead,
+            bytes_read: bytesRead,
+            cache_bytes_written: 0,
+            duration_ms: Date.now() - startedMs,
+          },
+        };
+      }
+    } catch {
+      // fall through to refresh
     }
-  } catch {
-    // fall through to refresh
   }
 
   const latestManifestInfo = await findLatestCoreManifestKey();

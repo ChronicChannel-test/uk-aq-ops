@@ -1,0 +1,106 @@
+name: Deploy Metadata Refresh Cloud Run Job
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "workers/uk_aq_metadata_refresh_service/**"
+      - "workers/uk_aq_latest_snapshot_cloud_run/**"
+      - "scripts/backup_r2/uk_aq_core_snapshot_to_r2.mjs"
+      - "workers/shared/r2_sigv4.mjs"
+      - ".github/workflows/uk_aq_metadata_refresh_cloud_run_deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: uk-aq-metadata-refresh-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-metadata-refresh-job:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || 'europe-west2' }}
+      REPO: ${{ vars.GCP_ARTIFACT_REPO || 'uk-aq' }}
+      JOB_NAME: ${{ vars.GCP_METADATA_REFRESH_JOB_NAME || 'uk-aq-metadata-refresh' }}
+      SERVICE_ACCOUNT: ${{ vars.GCP_METADATA_REFRESH_SERVICE_ACCOUNT || vars.GCP_OPS_JOB_SERVICE_ACCOUNT || '' }}
+      SCHEDULER_JOB_NAME: ${{ vars.GCP_METADATA_REFRESH_SCHEDULER_JOB_NAME || 'uk-aq-metadata-refresh-every-5-minutes' }}
+      SCHEDULER_CRON: ${{ vars.GCP_METADATA_REFRESH_SCHEDULER_CRON || '*/5 * * * *' }}
+      SCHEDULER_TIMEZONE: ${{ vars.GCP_METADATA_REFRESH_SCHEDULER_TIMEZONE || 'Etc/UTC' }}
+      SCHEDULER_SERVICE_ACCOUNT: ${{ vars.GCP_METADATA_REFRESH_SCHEDULER_SERVICE_ACCOUNT || vars.GCP_OPS_JOB_SERVICE_ACCOUNT || '' }}
+      OBS_AQIDB_DB_URL_SECRET_NAME: ${{ vars.OBS_AQIDB_DB_URL_SECRET_NAME || 'OBS_AQIDB_DB_URL' }}
+      CFLARE_R2_ACCESS_KEY_ID_SECRET_NAME: ${{ vars.CFLARE_R2_ACCESS_KEY_ID_SECRET_NAME || 'CFLARE_R2_ACCESS_KEY_ID' }}
+      CFLARE_R2_SECRET_ACCESS_KEY_SECRET_NAME: ${{ vars.CFLARE_R2_SECRET_ACCESS_KEY_SECRET_NAME || 'CFLARE_R2_SECRET_ACCESS_KEY' }}
+      CFLARE_R2_ENDPOINT: ${{ vars.CFLARE_R2_ENDPOINT || vars.R2_ENDPOINT }}
+      CFLARE_R2_BUCKET: ${{ vars.CFLARE_R2_BUCKET || vars.R2_BUCKET }}
+      CFLARE_R2_REGION: ${{ vars.CFLARE_R2_REGION || vars.R2_REGION || 'auto' }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate config
+        run: |
+          set -euo pipefail
+          test -n "${PROJECT_ID}" || { echo "Missing GCP_PROJECT_ID"; exit 1; }
+          test -n "${SERVICE_ACCOUNT}" || { echo "Missing metadata refresh service account"; exit 1; }
+          test -n "${CFLARE_R2_ENDPOINT}" || { echo "Missing CFLARE_R2_ENDPOINT/R2_ENDPOINT"; exit 1; }
+          test -n "${CFLARE_R2_BUCKET}" || { echo "Missing CFLARE_R2_BUCKET/R2_BUCKET"; exit 1; }
+
+      - name: Authenticate to Google Cloud (WIF)
+        if: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (Service Account Key fallback)
+        if: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER == '' || env.GCP_SERVICE_ACCOUNT == '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        id: build
+        run: |
+          set -euo pipefail
+          image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${JOB_NAME}:${GITHUB_SHA}"
+          docker build -f workers/uk_aq_metadata_refresh_service/Dockerfile -t "${image}" .
+          docker push "${image}"
+          echo "image=${image}" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy Cloud Run job
+        run: |
+          set -euo pipefail
+          gcloud run jobs deploy "${JOB_NAME}" \
+            --region "${REGION}" \
+            --image "${{ steps.build.outputs.image }}" \
+            --service-account "${SERVICE_ACCOUNT}" \
+            --set-env-vars "CFLARE_R2_ENDPOINT=${CFLARE_R2_ENDPOINT},CFLARE_R2_BUCKET=${CFLARE_R2_BUCKET},CFLARE_R2_REGION=${CFLARE_R2_REGION},UK_AQ_METADATA_REFRESH_QUIET_PERIOD_SECONDS=120" \
+            --set-secrets "OBS_AQIDB_DB_URL=${OBS_AQIDB_DB_URL_SECRET_NAME}:latest,CFLARE_R2_ACCESS_KEY_ID=${CFLARE_R2_ACCESS_KEY_ID_SECRET_NAME}:latest,CFLARE_R2_SECRET_ACCESS_KEY=${CFLARE_R2_SECRET_ACCESS_KEY_SECRET_NAME}:latest" \
+            --max-retries 0 \
+            --task-timeout 900s
+
+      - name: Ensure scheduler
+        run: |
+          set -euo pipefail
+          scheduler_sa="${SCHEDULER_SERVICE_ACCOUNT:-${SERVICE_ACCOUNT}}"
+          gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+            --member "serviceAccount:${scheduler_sa}" \
+            --role roles/run.invoker >/dev/null
+          uri="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${JOB_NAME}:run"
+          if gcloud scheduler jobs describe "${SCHEDULER_JOB_NAME}" --location "${REGION}" >/dev/null 2>&1; then
+            gcloud scheduler jobs update http "${SCHEDULER_JOB_NAME}" --location "${REGION}" --schedule "${SCHEDULER_CRON}" --time-zone "${SCHEDULER_TIMEZONE}" --uri "${uri}" --http-method POST --oauth-service-account-email "${scheduler_sa}"
+          else
+            gcloud scheduler jobs create http "${SCHEDULER_JOB_NAME}" --location "${REGION}" --schedule "${SCHEDULER_CRON}" --time-zone "${SCHEDULER_TIMEZONE}" --uri "${uri}" --http-method POST --oauth-service-account-email "${scheduler_sa}"
+          fi

@@ -69,3 +69,11 @@ The run report includes this trigger mode.
 - Missing station/network metadata is counted as `missing_metadata_rows` and skipped instead of falling back to connector-derived network fields. Networks with `public_display_enabled=false` are skipped.
 
 - Runtime and deploy workflow validation reject obvious cross-version standard paths: v2 cannot use `latest_snapshots/v1` for the snapshot prefix, manifest key, or runs prefix, and v1 cannot use `latest_snapshots/v2`. Custom non-versioned prefixes are still allowed.
+
+## Forced metadata refresh
+
+Set `UK_AQ_LATEST_SNAPSHOT_FORCE_METADATA_REFRESH=1` for a run that must bypass the R2
+`core_metadata_cache_v2.json` freshness check. The builder will load the latest core metadata
+manifest and required tables from R2, rewrite the metadata cache, and then continue normal latest
+snapshot generation. The default remains `false`, so normal scheduler runs keep using a fresh cache
+until `UK_AQ_LATEST_SNAPSHOT_METADATA_REFRESH_SECONDS` expires.
