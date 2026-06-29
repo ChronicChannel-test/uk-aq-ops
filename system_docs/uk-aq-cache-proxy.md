@@ -83,6 +83,10 @@ Read endpoints:
 - `/api/aq/latest-snapshot` -> external latest snapshot R2 API URL (`UK_AQ_LATEST_SNAPSHOT_R2_API_URL`)
   - serves deterministic latest snapshot objects from R2 (`pollutant/window/network_group`)
   - uses realtime cache profile (`max-age=60`)
+  - isolates v2 responses in an internal cache-key namespace without changing
+    the stable browser URL
+  - requires upstream header `X-UK-AQ-Snapshot-Contract: v2`; mismatches fail
+    with `502 latest_snapshot_contract_mismatch` and are not cached
 
 ## Required GitHub env/secret targets
 

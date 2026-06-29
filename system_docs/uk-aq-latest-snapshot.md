@@ -20,7 +20,7 @@ Build frequency is every minute via Cloud Scheduler.
 - Deploy workflow: `.github/workflows/uk_aq_latest_snapshot_cloud_run_deploy.yml`
 - Pulls observation messages from a dedicated Pub/Sub subscription.
 - Maintains latest-per-timeseries state in R2 (`latest_snapshots_state/v1` by default).
-- Refreshes metadata from daily R2 core snapshot (`history/v1/core` by default; daily refresh cadence).
+- Refreshes metadata from daily R2 core snapshot (`history/v2/core` by default; daily refresh cadence).
 - Writes snapshot objects + family manifest to R2.
 
 2. Latest snapshot R2 API Worker
@@ -31,11 +31,15 @@ Build frequency is every minute via Cloud Scheduler.
   - `GET /v1/manifest`
   - `GET /v1/health`
 - Requires upstream auth header: `x-uk-aq-upstream-auth`.
+- Is hard-cut to `latest_snapshots/v2`; v1 prefixes fail closed and are never used as fallback.
+- Marks successful object responses with `X-UK-AQ-Snapshot-Contract: v2`.
 
 3. Cache proxy route
 - Path: `workers/uk_aq_cache_proxy/src/index.ts`
 - External route: `/api/aq/latest-snapshot`
 - Upstream target configured by: `UK_AQ_LATEST_SNAPSHOT_R2_API_URL`.
+- Uses a private v2 cache-key namespace and rejects successful upstream responses
+  that do not declare the v2 snapshot contract.
 - Returns `upstream_fetch_failed` when upstream is unreachable/failing.
 
 ## Request Flow
@@ -45,7 +49,7 @@ Build frequency is every minute via Cloud Scheduler.
 3. Cloud Run service pulls Pub/Sub observations from the latest-snapshot subscription.
 4. Service updates R2 latest-state object.
 5. Service acknowledges pulled Pub/Sub messages in bounded chunks to stay below Pub/Sub request-size limits during burst/backlog drains.
-6. Service loads cached core metadata (refreshes from latest `history/v1/core/day_utc=...` snapshot once stale).
+6. Service loads cached core metadata (refreshes from latest `history/v2/core/day_utc=...` snapshot once stale).
 7. Service builds the matrix payloads and writes changed snapshot objects to R2.
 8. Service writes/updates latest family manifest.
 9. Browser calls cache proxy route: `/api/aq/latest-snapshot?...`.
@@ -82,7 +86,13 @@ The Phase 5 builder writes v2 snapshot objects under `latest_snapshots/v2` by de
 
 v2 rows do not include `station_network_memberships`, `network_memberships`, `network_name`, or `network_type`. `network_type` is reserved for the public network catalog/API phase rather than being repeated on every latest row. Existing connector provenance fields (`connector_code`, `connector_label`) remain in the row contract.
 
-For compatibility rebuilds, set `UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION=v1` with an explicit v1 prefix. v1 rows continue to emit `station_network_memberships`; v2 does not rewrite or delete existing v1 objects. Missing station/network metadata is reported through `missing_metadata_rows` and skipped instead of using connector fallbacks. Disabled networks are skipped before payload writes.
+For internal compatibility rebuilds, the builder can still be set to
+`UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION=v1` with an explicit v1 prefix. Those
+objects are not eligible for the public R2 API worker. The public worker accepts
+only the canonical v2 prefix and manifest and never falls back to v1. Existing
+immutable v1 objects are not rewritten or deleted. Missing station/network
+metadata is reported through `missing_metadata_rows` and skipped instead of
+using connector fallbacks. Disabled networks are skipped before payload writes.
 
 - Runtime and deploy workflow validation reject obvious cross-version standard paths: v2 cannot use `latest_snapshots/v1` for the snapshot prefix, manifest key, or runs prefix, and v1 cannot use `latest_snapshots/v2`. Custom non-versioned prefixes are still allowed.
 
@@ -175,6 +185,13 @@ When `UK_AQ_LATEST_SNAPSHOT_R2_API_URL` changes, redeploy cache proxy so Worker 
 1. Confirm Cloud Run builder has run successfully.
 2. Check manifest at `latest_snapshots/v2/manifest.json`.
 3. Check expected snapshot object key exists for requested `(pollutant, window, network_group)`.
+
+`502 latest_snapshot_contract_mismatch` from the cache proxy:
+
+1. Deploy the latest snapshot R2 API worker before the cache proxy.
+2. Confirm the upstream worker returns `X-UK-AQ-Snapshot-Contract: v2`.
+3. Confirm its prefix and manifest are exactly `latest_snapshots/v2` and
+   `latest_snapshots/v2/manifest.json`.
 
 Cloud Run builder fails with subscription safety error:
 
