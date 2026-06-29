@@ -54,37 +54,26 @@ Build frequency is every minute via Cloud Scheduler.
 
 ## R2 Key Layout
 
-Default snapshot prefix: `latest_snapshots/v2`
+Default snapshot prefix: `latest_snapshots/v1`
 
 Snapshot object keys:
 
-- `latest_snapshots/v2/network_group=all/pollutant=pm25/window=3h.json`
-- `latest_snapshots/v2/network_group=all/pollutant=pm10/window=6h.json`
-- `latest_snapshots/v2/network_group=all/pollutant=no2/window=1d.json`
+- `latest_snapshots/v1/network_group=all/pollutant=pm25/window=3h.json`
+- `latest_snapshots/v1/network_group=all/pollutant=pm10/window=6h.json`
+- `latest_snapshots/v1/network_group=all/pollutant=no2/window=1d.json`
 
 Manifest key:
 
-- `latest_snapshots/v2/manifest.json`
+- `latest_snapshots/v1/manifest.json`
 
 Optional run report keys:
 
-- `latest_snapshots/v2/_runs/<UTC timestamp>.json`
+- `latest_snapshots/v1/_runs/<UTC timestamp>.json`
 
 Default state/metadata cache keys:
 
 - `latest_snapshots_state/v1/latest_state.json`
-- `latest_snapshots_state/v1/core_metadata_cache_v2.json`
-
-
-### Latest snapshot v2 row contract
-
-The Phase 5 builder writes v2 snapshot objects under `latest_snapshots/v2` by default while retaining the existing latest-observation state prefix. Each row derives its public network identity from `station.network_id -> networks.id` in the core metadata cache. v2 rows include scalar `network_id`, `network_code`, and `network_label`; `network_label` is the canonical network display name.
-
-v2 rows do not include `station_network_memberships`, `network_memberships`, `network_name`, or `network_type`. `network_type` is reserved for the public network catalog/API phase rather than being repeated on every latest row. Existing connector provenance fields (`connector_code`, `connector_label`) remain in the row contract.
-
-For compatibility rebuilds, set `UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION=v1` with an explicit v1 prefix. v1 rows continue to emit `station_network_memberships`; v2 does not rewrite or delete existing v1 objects. Missing station/network metadata is reported through `missing_metadata_rows` and skipped instead of using connector fallbacks. Disabled networks are skipped before payload writes.
-
-- Runtime and deploy workflow validation reject obvious cross-version standard paths: v2 cannot use `latest_snapshots/v1` for the snapshot prefix, manifest key, or runs prefix, and v1 cannot use `latest_snapshots/v2`. Custom non-versioned prefixes are still allowed.
+- `latest_snapshots_state/v1/core_metadata_cache.json`
 
 ## Query Contract
 
@@ -128,21 +117,19 @@ Builder data/object controls:
 - `UK_AQ_LATEST_SNAPSHOT_POLLUTANTS` (default `pm25,pm10,no2`)
 - `UK_AQ_LATEST_SNAPSHOT_WINDOWS` (default `3h,6h,1d,7d,all`)
 - `UK_AQ_LATEST_SNAPSHOT_NETWORK_GROUP` (default `all`)
-- `UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION` (default `v2`)
-- `UK_AQ_LATEST_SNAPSHOT_R2_PREFIX` (default `latest_snapshots/${UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION}`; currently `latest_snapshots/v2`)
+- `UK_AQ_LATEST_SNAPSHOT_R2_PREFIX` (default `latest_snapshots/v1`)
 - `UK_AQ_LATEST_SNAPSHOT_MANIFEST_KEY` (default `${prefix}/manifest.json`)
 - `UK_AQ_LATEST_SNAPSHOT_RUNS_PREFIX` (default `${prefix}/_runs`)
 - `UK_AQ_LATEST_SNAPSHOT_RUN_REPORTS_ENABLED` (default `true`)
 - `UK_AQ_LATEST_SNAPSHOT_STATE_PREFIX` (default `latest_snapshots_state/v1`)
-- `UK_AQ_LATEST_SNAPSHOT_CORE_METADATA_PREFIX` (default `history/v2/core`)
+- `UK_AQ_LATEST_SNAPSHOT_CORE_METADATA_PREFIX` (default `history/v1/core`)
 - `UK_AQ_LATEST_SNAPSHOT_METADATA_REFRESH_SECONDS` (default `86400`)
 
 R2 API Worker controls:
 
 - `UK_AQ_LATEST_SNAPSHOT_R2_API_WORKER_NAME` (deploy target; default `uk-aq-latest-snapshot-r2-api`)
 - `UK_AQ_LATEST_SNAPSHOT_R2_CACHE_MAX_AGE_SECONDS` (default `60`)
-- `UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION` (default `v2`)
-- `UK_AQ_LATEST_SNAPSHOT_R2_PREFIX` (default `latest_snapshots/${UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION}`; currently `latest_snapshots/v2`)
+- `UK_AQ_LATEST_SNAPSHOT_R2_PREFIX` (default `latest_snapshots/v1`)
 - `UK_AQ_LATEST_SNAPSHOT_MANIFEST_KEY` (default `${prefix}/manifest.json`)
 
 Cache proxy integration control:
@@ -173,7 +160,7 @@ When `UK_AQ_LATEST_SNAPSHOT_R2_API_URL` changes, redeploy cache proxy so Worker 
 `404 snapshot_not_found` from latest snapshot R2 API worker:
 
 1. Confirm Cloud Run builder has run successfully.
-2. Check manifest at `latest_snapshots/v2/manifest.json`.
+2. Check manifest at `latest_snapshots/v1/manifest.json`.
 3. Check expected snapshot object key exists for requested `(pollutant, window, network_group)`.
 
 Cloud Run builder fails with subscription safety error:
