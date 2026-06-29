@@ -54,7 +54,7 @@ It also includes the related identity-backed rows those records reference, such 
 - `offerings.id`
 - `features.id`
 - `procedures.id`
-- `networks.id`
+- `uk_aq_networks.id`
 
 ## 4. Import The Full Core Table Set
 
@@ -67,11 +67,12 @@ The import should cover the same core snapshot table set used by the R2 core sna
 - `offerings`
 - `features`
 - `procedures`
-- `networks`
+- `uk_aq_networks`
 - `uk_air_sos_networks`
 - `uk_air_sos_network_pollutants`
 - `stations`
 - `station_metadata`
+- `station_network_memberships`
 - `timeseries`
 
 This is the same table set exported by:
@@ -82,7 +83,7 @@ This is the same table set exported by:
 
 The import order must respect the foreign-key relationships in `uk_aq_core`.
 
-In practice, that means loading parent/reference tables before dependent tables, and loading `station_metadata` and `timeseries` only after the referenced base rows exist.
+In practice, that means loading parent/reference tables before dependent tables, and loading `station_metadata`, `station_network_memberships`, and `timeseries` only after the referenced base rows exist.
 
 ## 6. Reset Identity Sequences After Import
 
@@ -134,7 +135,7 @@ After the DB import and before R2 restore:
 - Confirm known connector IDs match source/test.
 - Confirm known station IDs match source/test.
 - Confirm known timeseries IDs match source/test.
-- Confirm FK-dependent tables such as `station_metadata` and `timeseries` loaded cleanly.
+- Confirm FK-dependent tables such as `station_metadata`, `station_network_memberships`, and `timeseries` loaded cleanly.
 - Confirm identity sequences have been advanced to at least `max(id)`.
 
 ## Short Version

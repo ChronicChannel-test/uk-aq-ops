@@ -602,7 +602,8 @@ source_station_timeseries_lookup
 Only the columns the integrity tooling needs are imported (PK + the fields
 used for lookup, filtering, or reporting). Other manifest tables
 (`categories`, `observed_properties`, `offerings`, `features`, `procedures`,
-`networks`, `uk_air_sos_*`, and `station_metadata`) are accepted in the manifest but not loaded.
+`uk_aq_networks`, `uk_air_sos_*`, `station_metadata`,
+`station_network_memberships`) are accepted in the manifest but not loaded.
 
 The lookup table allows:
 
