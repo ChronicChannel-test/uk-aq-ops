@@ -84,6 +84,8 @@ v2 rows do not include `station_network_memberships`, `network_memberships`, `ne
 
 For compatibility rebuilds, set `UK_AQ_LATEST_SNAPSHOT_CONTRACT_VERSION=v1` with an explicit v1 prefix. v1 rows continue to emit `station_network_memberships`; v2 does not rewrite or delete existing v1 objects. Missing station/network metadata is reported through `missing_metadata_rows` and skipped instead of using connector fallbacks. Disabled networks are skipped before payload writes.
 
+- Runtime and deploy workflow validation reject obvious cross-version standard paths: v2 cannot use `latest_snapshots/v1` for the snapshot prefix, manifest key, or runs prefix, and v1 cannot use `latest_snapshots/v2`. Custom non-versioned prefixes are still allowed.
+
 ## Query Contract
 
 R2 API Worker endpoint:
