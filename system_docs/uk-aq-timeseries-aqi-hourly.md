@@ -14,6 +14,12 @@ rerun the affected hourly or reconciliation window. A station FK failure that
 escapes preflight is logged as `missing_station_fk_unhandled_by_preflight` and
 still fails the run.
 
+Station-FK preflight reads the ID-only
+`uk_aq_public.stations_fk_check` view in Obs AQI DB. It does not query ingest DB,
+and `uk_aq_core` remains intentionally unavailable through Obs AQI DB
+PostgREST. A missing view causes a controlled station-FK preflight failure
+before the hourly upsert.
+
 ## Why reconciliation was added
 
 Late observations frequently land after the worker's original single-hour sync window has already run, which leaves null AQI stripe gaps in downstream charts until a manual backfill happens. Measured lag from recent investigation showed the hourly-only window is too narrow for real production latency:
@@ -118,6 +124,8 @@ Defaults:
 - `UK_AQ_AQI_RECONCILE_SHORT_HOURS=8`
 - `UK_AQ_AQI_RECONCILE_DEEP_HOURS=36`
 - `UK_AQ_AQI_RECONCILE_DEEP_REFRESH_CHUNK_HOURS=6`
+- `UK_AQ_AQI_STATION_FK_CHECK_SCHEMA=uk_aq_public`
+- `UK_AQ_AQI_STATION_FK_CHECK_VIEW=stations_fk_check`
 
 Deep helper refresh is split into sequential UTC hour-end chunks to avoid
 `canceling statement due to statement timeout` on a single large database
