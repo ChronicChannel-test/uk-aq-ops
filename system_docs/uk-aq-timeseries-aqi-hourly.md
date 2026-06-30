@@ -49,6 +49,17 @@ Required secrets:
 
 - `SB_SECRET_KEY`
 - `OBS_AQIDB_SECRET_KEY`
+- `DROPBOX_APP_KEY`
+- `DROPBOX_APP_SECRET`
+- `DROPBOX_REFRESH_TOKEN`
+
+Required Dropbox variable:
+
+- `UK_AQ_DROPBOX_ROOT` (workflow default `/CIC-Test`)
+
+The deploy workflow synchronises all five secrets to GCP Secret Manager and
+binds them to the Cloud Run service. Dropbox credentials are required for the
+structured missing-station error files under `error_log/`.
 
 Google auth (choose one):
 
