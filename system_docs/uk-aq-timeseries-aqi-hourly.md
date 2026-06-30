@@ -117,6 +117,19 @@ Defaults:
 
 - `UK_AQ_AQI_RECONCILE_SHORT_HOURS=8`
 - `UK_AQ_AQI_RECONCILE_DEEP_HOURS=36`
+- `UK_AQ_AQI_RECONCILE_DEEP_REFRESH_CHUNK_HOURS=6`
+
+Deep helper refresh is split into sequential UTC hour-end chunks to avoid
+`canceling statement due to statement timeout` on a single large database
+statement. Each chunk preserves `(start_exclusive, end_inclusive]` semantics.
+After every chunk succeeds, the existing helper-window paging, station FK
+guard, AQI upsert, and rollup flow runs unchanged. Chunk metrics are aggregated
+into the existing helper-refresh summary fields, with additional chunk count,
+size, and failed-chunk fields.
+
+If deep reconciliation still times out, lower the chunk-hours setting. If it is
+stable but too slow, increase it cautiously up to the deep-window size. Do not
+increase the Postgres statement timeout as the first response.
 
 Behavior by mode:
 
