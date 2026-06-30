@@ -2,17 +2,7 @@
 
 This service syncs timeseries-hour AQI helper rows from ingest DB into `obs_aqidb` (`uk_aq_aqilevels`) and now also reconciles late-arriving observations over recent rolling windows. AQI helper computation itself is still scheduled in ingest DB via `pg_cron`; this worker reuses the existing helper-window, hourly-upsert, and rollup-refresh RPCs. Reconciliation modes now rebuild the ingest helper window from raw observations before reading it, and helper-window reads are paginated because PostgREST caps each table-valued RPC response page at 1000 rows.
 
-If helper rows arrive for a station ID that is still missing from Obs AQI DB
-mirrored `uk_aq_core.stations`, the worker preflights candidate IDs, skips only
-the invalid rows, and continues valid hourly and rollup work. Structured
-`missing_station_fk` entries are emitted to Cloud Logging and uploaded to
-`/CIC-Test/error_log/YYYY-MM-DD/` using the
-`uk_aq_error_cloud_run_timeseries_aqi_hourly_*` naming convention. The event
-includes the run mode, trigger mode, UTC window, missing IDs, skipped count, and
-a sample capped at 20 rows. Repair or refresh the mirrored stations table, then
-rerun the affected hourly or reconciliation window. A station FK failure that
-escapes preflight is logged as `missing_station_fk_unhandled_by_preflight` and
-still fails the run.
+If helper rows arrive for a station ID that is still missing from Obs AQI DB mirrored `uk_aq_core.stations`, the worker skips those rows and logs the skipped station IDs and row counts instead of failing the whole AQI run.
 
 ## Why reconciliation was added
 
