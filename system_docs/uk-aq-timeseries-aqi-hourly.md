@@ -110,6 +110,28 @@ When `GCP_TIMESERIES_AQI_HOURLY_SCHEDULER_ENABLED=true`, the deploy workflow kee
 
 If you do not want the workflow to manage the optional jobs, call the Cloud Run service manually with the same JSON payloads shown above.
 
+### Per-trigger attempt deadlines
+
+Scheduler attempt deadlines are configured independently. When a value is
+blank or omitted, the deploy workflow does not pass `--attempt-deadline`, so
+GCP retains its default behavior for that job.
+
+- sync hourly: `GCP_TIMESERIES_AQI_HOURLY_ATTEMPT_DEADLINE`, blank by default;
+  leave blank or use `180s` if needed
+- short reconcile:
+  `GCP_TIMESERIES_AQI_HOURLY_RECONCILE_SHORT_ATTEMPT_DEADLINE`, blank by
+  default; leave blank or use `300s` if needed
+- rolling deep:
+  `GCP_TIMESERIES_AQI_HOURLY_RECONCILE_DEEP_ROLLING_ATTEMPT_DEADLINE`,
+  default `600s`
+- legacy deep: `GCP_TIMESERIES_AQI_HOURLY_RECONCILE_DEEP_ATTEMPT_DEADLINE`,
+  blank by default; keep this trigger paused and, if manually enabled with
+  caution, consider `900s`
+
+The deadline is passed to both Scheduler create and update commands. It does
+not alter the Cloud Run timeout, cron schedules, payloads, retry settings, or
+OIDC authentication.
+
 ## Trigger Window Logic
 
 Worker computes one mature reference hour-end:
